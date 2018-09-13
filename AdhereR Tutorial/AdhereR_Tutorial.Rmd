@@ -1,0 +1,460 @@
+---
+title: "AdhereR Tutorial"
+output: 
+  learnr::tutorial:
+    progressive: true
+  
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Introduction
+
+`AdhereR` is an R package that aims to facilitate the computing of adherence from EHD, as well as the transparent reporting of the chosen calculations. 
+It contains a set of `R` `S3` *classes* and *functions* that *compute*, *summarize* and *plot* various estimates of adherence. 
+
+This tutorial aims to introduce researchers to the principles of EHD preparation required to estimate adherence with the AdhereR package. It uses example data to illustrate the various decisions required and their impact on estimates, starting with the visualization of medication events, computation of persistence (treatment episode length), and computation of adherence.
+
+Please contact us with suggestions, bug reports, comments (or even just to share your experiences using the package) either by e-mail (to Dan <ddediu@gmail.com>, Alexandra <alexadima@gmail.com> or Samuel (samuel.allemann@gmx.ch)) or using GitHub's reporting mechanism at our repository <https://github.com/ddediu/AdhereR>, which contains the full source code of the package. 
+
+```{r quiz-1}
+quiz(
+  question("Which data can be used to estimate adherence with the AdhereR package?",
+    answer("Pharmacy records", correct = TRUE),
+    answer("MEMS data"),
+    answer("Insurance claims", correct = TRUE),
+    answer("Self-report")
+  )
+)
+```
+
+## Dataset
+
+### Minimal requirements
+
+`AdhereR` requires a clean dataset with a minimum of information for each medication event. `AdhereR` is thus designed to use datasets that have already been extracted from EHD and prepared for calculation. 
+The preliminary data preparation depend to a large extent on the specific database used and the type of medication and research design. 
+
+```{r quiz-2}
+quiz(
+  question("Which minimum information is required to estimate adherence with AdhereR?",
+    answer("Unique patient ID", correct = TRUE),
+    answer("Event date", correct = TRUE),
+    answer("Daily dosage"),
+    answer("Medication type"),
+    answer("Supply duration", correct = TRUE)
+  )
+)
+```
+
+Oftentimes, datasets can be large with hundreds of thousands or even millions of rows. Provided that working memory is big enough to hold the entire dataset, R can handle it. Manipulating these large datasets with the standard R libraries can be a hassle. We propose to use the package `data.table`, which usually requires less memory and is faster than the standard `data.frame` format. However, AdhereR currently requires a `data.frame` as input, so remember to convert your final dataset with `as.data.frame()` before using the AdhereR functions!
+
+### Example dataset
+
+Suppose you have a dataset with the following information:
+
+- patient unique identifier (`PATIENT.ID`), 
+- event date (`DATE.DISP`; date of dispensing, in the "mm.dd.yyyy" format),
+- ATC code (`ATC.CODE`; alpha-numeric code to identify the medication)
+- dosage (`DOSE`; strength of the dispensed medication with unit), and
+- quantity (`QUANTITY`; number of units dispensed). 
+
+Table 1 shows the medication events of one example patient: 32 medication events related to 8 medications. 
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# Load the AdhereR and data.table libraries (and install if not already installed):
+if (!require("AdhereR")) install.packages("AdhereR")
+if (!require("data.table")) install.packages("data.table")
+
+# Load example dataset
+disp_events <- fread("data/example_disp_events.csv")
+# Display the data for the first patient:
+disp_events[PATIENT.ID == 42]
+```
+
+## Data preparation
+
+### Data cleaning
+
+First, we have to make sure that the data is in the right format. We can use the function `str()` to check the format of our variables and `summary()` for a first plausibility check.
+
+```{r, echo=TRUE}
+# Check format of variables:
+str(disp_events)
+```
+
+We can see that the `DATE.DISP` column is in *CHARACTER* instead of *DATE* format, and the `DOSE` is in *CHARACTER* format, too, because the unit is appended to it. 
+
+### Exercise: examine data
+
+Write the command to display a summary of `disp_events`. Run your code by clicking on "Run Code" at the top right of the Code window. If you want to start over, click "Start Over", at the top left. Click the "Hint" button for Help.
+
+```{r summary_events, exercise=TRUE}
+disp_events <- fread("data/example_disp_events.csv")
+
+# Display summary of data:
+
+```
+
+<div id="summary_events-hint">
+**Hint:** You may want tu use the `summary()` function.
+</div>
+
+### Conversion of data types
+ 
+We want to convert the `DATE.DISP` to the appropriate format and extract the numeric part and the characters from the `DOSE` variable into separate variables `DOSE.num` and `UNIT`. 
+
+```{r, echo=TRUE}
+# Convert DATE to the DATE format and split DOSE into two variables:
+disp_events[, DATE.DISP := as.Date(DATE.DISP, format = "%d.%m.%Y")] #convert Date to date format
+
+disp_events[,c("DOSE.num", "UNIT"):= tstrsplit(DOSE, " ")] #split Dose on whitespace
+disp_events[,DOSE := NULL]
+```
+
+### Exercise: type conversion
+
+Write the commands to convert the `DOSE.num` variable to *NUMERIC* and the `UNIT` variable to *FACTOR*.
+
+```{r convert_variables, exercise=TRUE, exercise.eval=TRUE}
+# add the code to convert DOSE.num to numeric and UNIT to factor:
+
+
+
+```
+
+```{r convert_variables-hint}
+disp_events[,`:=` (DOSE.num = as.numeric(DOSE.num) #convert DOSE.num to numeric
+                   )]
+```
+
+Now that the data is in the right format, we can see if there are any implausible or missing data from the summary.
+For example, we can see that all the dates appear to be from the years 2014-2016, which corresponds with our intended follow-up window. 
+
+### Reproducible and transparent data modifications
+
+There are 4 different units in the `UNIT` variable: *MG*, *MCG*, *MICROG*, and *UI*. *MCG* and *MICROG* both refer to the same unit, microgrammes, so there should be only one version of this unit. We could change the original data and replace all instances of *MCG* with *MICROG*, but one of the data cleaning principles is to never change the original data. Instead, we will modify the data transparently and reproducibly in our script. If there are a lot of modificiations, this could be in a separate file that contains only the modifications.
+
+We can use a named `list` to change the levels of a factor:
+
+```{r, echo=TRUE}
+# Assign *MCG* and *MICROG* to the same factor level
+levels(disp_events$UNIT) <- list(MICROG=c("MCG", "MICROG"), MG="MG", UI="UI")
+
+summary(disp_events)
+```
+
+## Data processing
+
+### Supply duration
+
+To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, but we only have the quantity. We could assume that patients need to administer one unit per day and use the `QUANTITY` variable, but oftentimes, this is not appropriate. Sometimes, standard doses, e.g. WHO's 'Defined Daily Dose' or other assumptions may be appropriate in some instances, but might introduce bias in other situations.
+
+For this tutorial, we have a second database where the prescribed dosage for each medication per patient is recorded: 
+
+- patient unique identifier (`PATIENT.ID`), 
+- event date (`DATE.PRESC`; date of prescription, in the "mm/dd/yyyy" format),
+- ATC code (`ATC.CODE`; alpha-numeric code to identify the medication)
+- dosage (`DAILY.DOSE`; prescribed dose of the medication per day), and
+- unit (`UNIT`; unit of the prescribed dose). 
+
+```{r, echo=TRUE}
+# Load example prescription data:
+
+load("data/example_presc_events.RData")
+
+presc_events
+
+```
+Conveniently, this dataset is already clean and all the data is in the right format. Moreover, there is only one prescription event per medication, which occured before the first dispensing event, so we don't have to deal with prescription changes during our follow-up period.
+
+### Merge prescription and dispensing data
+
+We can now merge the two datasets and calculate the duration for each dispensing event. We merge by `PATIENT.ID`, `ATC.CODE` code and `UNIT` to make sure that events are matched correctly. This is why it was necessary to clean up the units: Otherwise, some events might not merge correctly due to mismatches between the units.
+
+By default, the `merge` function only includes rows where the ID-variable are present in both instances. This means that we only capture medications that were prescribed and at least once dispensed during the follow-up period. If we want to capture all events, we can specify `all = TRUE` in the function arguments.
+
+### Exercise: Add daily doses from separate file
+
+Write the command to merge `disp_events` and `presc_events` by `PATIENT.ID`, `ATC.CODE` code and `UNIT` into a new object called `med_events`
+
+```{r merge-data, exercise=TRUE, exercise.eval=TRUE}
+# Merge dispensing and prescription data to create an object 'med_events':
+
+# Print the merged data.table 'med_events'
+
+```
+
+```{r merge-data-solution}
+# Merge dispensing and prescription data to create an object 'med_events':
+med_events <- merge(disp_events, presc_events, by = c("PATIENT.ID", "ATC.CODE", "UNIT"), all = TRUE, sort = FALSE)
+
+# Print the merged data.table 'med_events'
+med_events
+```
+
+### Exercise: Calculate supply duration
+
+Now calculate the supply duration by multiplying the dispensed Dose and quantity and dividing it by the prescribed daily dose.
+
+```{r, echo = FALSE}
+disp_events[,`:=` (DOSE.num = as.numeric(DOSE.num), #convert DOSE.num to numeric
+                   UNIT = as.factor(UNIT) #convert UNIT to factor variable
+                   )]
+
+med_events <- merge(disp_events, presc_events, by = c("PATIENT.ID", "ATC.CODE", "UNIT"), all = TRUE, sort = FALSE)
+```
+
+
+```{r calculate-duration, exercise = TRUE, exercise.eval=TRUE}
+# Add a new column DURATION and Calculate the supply duration:
+
+# Display a summary of the object 'med_events'
+
+```
+```{r calculate-duration-solution}
+# Add a new column DURATION and Calculate the supply duration:
+med_events[,DURATION := (DOSE.num*QUANTITY)/DAILY.DOSE]
+
+# Display a summary of the object 'med_events'
+summary(med_events)
+```
+
+### Multiple data sources
+
+In its newest version, `AdhereR` now offers a function to link dispensing, prescription, and hospitalization data to improve the accuracy of adherence estimation. For each dispensing event, the function performs iterations of the following steps:
+
+1. automatically selects the last prescibed dose to calculate supply duration,
+2. checks for prescription changes and hospitalizations during this period, and
+3. adjusts the duration accordingly.
+
+The function requires the following input:
+
+- `x` : A *data.frame* with the dispensing data
+- `y` : A *data.frame* with the prescription data
+- `z` : optional, a *data.frame* with the hospitalization data
+- `ID.var` : A *character vector* of the ID column (identical in all data sources)
+- `DATE.PRESC.var` : A *character vector* of the prescription date column (in y)
+- `DATE.DISP.var` : A *character vector* of the prescription date column (in x)
+- `DATE.format` : A *character vector* of the date format (identical in all data sources)
+- `CATEGORY.var` : A *character vector* of the medication identification column (identical for x and y)
+- `TOTAL.DOSE.var` : A *numeric vector* of the column with the dispensed dose (in x)
+- `PERDAY.var` : A *numeric vector* of the column with the daily prescribed dose (in y)
+- `PRESC.DURATION.var` : : optional, A *integer vector* of the column with the prescription duration in days (in y)
+- `UNIT.var` : optional, A *character vector* of the medication unit column (identical for x and y)
+- `FORM.var` : optional, A *character vector* of the medication form column (identical for x and y)
+- `VISIT.var` : optional, A *integer vector* of the visit number (in y)
+- `force.init.presc` : *logical*, default *TRUE*; should first prescibed dose be used for dispensing events occuring before the first prescription event?
+- `force.presc.renew` : *logical*, default *TRUE*; if a medication has not been prescribed during a prescription event, should its prescription end on this date?
+- `consider.dosage.change` : *logical*, default *TRUE*; should the supply duration be recalculated in case of prescription changes?
+
+### Exercise: link dispensing and prescription data with AdhereR
+
+Use the `medication_match` function to merge `disp_events` and `presc_events` into `med_events`.
+
+```{r link-multiple-sources, exercise=TRUE}
+# Merge dispensing and prescription data with AdhereR's medication_match function:
+
+```
+
+In addition to the standard AdhereR columns, the output of the matching function contains some more columns with additional information:
+
+- `FIRST.PRESC` : A *Date* column with the date when the treatment was first prescribed 
+- `PRESC.START` : A *Date* column with the start date of a prescription episode
+- `PRESC.END` : A *Date* column with the end date of a prescription episode. If there is no end date, this will be `NA`
+- `DOSAGE.CHANGE` : An *integer* column with the number of dosage changes considered for a given dispensing event.
+
+## Visualization of patient records
+
+### Explore medication histories 
+
+A first step towards deciding which algorithm is appropriate for these data is to explore medication histories visually. 
+
+We can do this by creating an object of type `CMA0` for the two example patients, and plotting it. 
+This type of plots can of course be created for a much bigger subsample of patients and saved as as a `JPEG`, `PNG`, `TIFF`, `EPS` or `PDF` file using `R`'s plotting system for data exploration.
+
+```{r, echo=TRUE}
+example_data <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
+
+cma0 <- CMA0(data=example_data, # use the two selected patients
+             ID.colname="PATIENT_ID", # the name of the column containing the IDs
+             event.date.colname="DATE", # the name of the column containing the event date
+             event.duration.colname="DURATION", # the name of the column containing the duration
+             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
+             medication.class.colname="CATEGORY", # the name of the column containing the category
+             followup.window.start=0,  # FUW start in days since earliest event
+             observation.window.start=182, # OW start in days since earliest event
+             observation.window.duration=365, # OW duration in days
+             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+```
+
+## Exercise: Plot medication events
+
+Use `plot()` to visualize the medication events for `example_data`. You can set `align.all.patients = TRUE` to plot each patient relative to the earliest event date. 
+
+```{r plot-cma0, exercise = TRUE}
+# Plot the object (CMA0 shows the actual event data only):
+
+```
+
+```{r plot-cma0-solution}
+# Plot the object (CMA0 shows the actual event data only):
+plot(cma0, # the object to plot
+     align.all.patients=TRUE # plot all patients relative to their earliest event date.
+     )
+```
+
+### Interactive plotting
+
+During the exploratory phases of data analysis, it is sometimes extremely useful to be able to plot interactively various views of the data using different parameter settings.
+We have implemented such interactive plotting of medication histories and (simple and iterative) CMA estimates within [`RStudio`](https://www.rstudio.com) through the `plot_interactive_cma()` function. 
+
+This function cannot be used in this interactive tutorial, but you can use RStudio to check it out!
+
+## Adherence estimation
+
+### Adherence, Initiation, Implementation, and Persistence
+
+`AdhereR` facilitates the estimation of adherence during all its phases according to the ABC taxonomy. We will look at each element in the following order:
+
+1. Adherence
+2. Initiation
+3. Persistence
+4. Implementation
+
+## Adherence
+
+`AdhereR`estimates adherence as *Continuous Medication Availability* (CMA). The *simple* CMA measures *CMA1* - *CMA9* do not differentiate between implementation and persistence. 
+
+### Exercise: Calculate adherence
+
+Calculate CMA7 estimates for the patient with the ID 37. The follow-up window starts 30 days after the first event and the observation window should cover 120 days until 300 days after the first event. Plot the results as seen in the previous section.
+
+```{r calculate-CMA7, exercise = TRUE}
+
+```
+
+```{r calculate-CMA7-solution}
+example_data <- med.events[med.events$PATIENT_ID == 37, ]
+
+cma7 <- CMA7(data=example_data, # use the two selected patients
+             ID.colname="PATIENT_ID", # the name of the column containing the IDs
+             event.date.colname="DATE", # the name of the column containing the event date
+             event.duration.colname="DURATION", # the name of the column containing the duration
+             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
+             medication.class.colname="CATEGORY", # the name of the column containing the category
+             followup.window.start=30,  # FUW start in days since earliest event
+             observation.window.start=120, # OW start in days since earliest event
+             observation.window.duration=300, # OW duration in days
+             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+
+# Plot the object:
+plot(cma7) # the object to plot
+```
+
+##  Initiation
+
+If we have a dispensing and a prescription database, we can calculate time to initiation from the output of the `medication_match` function. 
+
+### Exercise: Calculate time to initiation
+
+Add a column to med_events with the time to initiation, calculated as the length of time between the first prescription and the first dispensing event.
+
+```{r time-to-initiation, exercise = TRUE}
+
+```
+
+<div id="time-to-initiation-hint">
+**Hint:** You may want tu use the `difftime` function.
+</div>
+
+## Persistence
+
+To distinguish between persistence with treatment and quality of implementation, `AdhereR` provides the function `compute.treatment.episodes()`. It reports the patient ID, episode number, date of episode start, gap days at the end of or after the treatment episode, duration of episode, and episode end date.
+
+### Exercise: compute treatment episodes
+
+Use the `compute.treatment.episodes()` function to compute treatment episodes for the `example_data` from the first event until the end of the follow-up period (720 days) with the following conditions:
+
+- Change of medication type should be considered as a new treatment episode
+- A gap of 90 days or more should be considered as a treatment interruption/discontinuation
+- Existing supply will be finished before starting a new supply of the same medication, but not for different medications
+- If the dosage recommendation changes with a new supply, existing supply will be administered according to the new dosage recommendations
+
+```{r treatment-episodes, exercise = TRUE, exercise.eval=TRUE}
+
+```
+
+```{r treatment-episodes-solution}
+TEs <- compute.treatment.episodes(example_data,
+                                  ID.colname="PATIENT_ID",
+                                  event.date.colname="DATE",
+                                  event.duration.colname="DURATION",
+                                  event.daily.dose.colname="PERDAY",
+                                  medication.class.colname="CATEGORY",
+                                  carryover.within.obs.window = TRUE, # carry-over inside the OW
+                                  carry.only.for.same.medication = TRUE, # & only for same type
+                                  consider.dosage.change = TRUE, # dosage change starts new episode...
+                                  medication.change.means.new.treatment.episode = TRUE, # & type change
+                                  maximum.permissible.gap = 90, # & a gap longer than 180 days
+                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  followup.window.start = 0, # 2-years FUW starts at earliest event
+                                  followup.window.start.unit = "days",
+                                  followup.window.duration = 720,
+                                  followup.window.duration.unit = "days",
+                                  date.format = "%m/%d/%Y")
+
+TEs
+```
+
+## Implementation
+
+If we want to make sure to only calculate adherence during the implementation phase, AdhereR offers function to calculate any simple CMA only during treatment episodes as computed with the `compute.treatment.episodes()` function.
+
+### Exercise: Calculate adherence for multiple treatment episodes during an observation window.
+
+Use the `CMA_per_episode()` function to compute CMA7 during the implementation phase for the `example_data` from the first event until the end of the follow-up period (720 days) with the following conditions:
+
+- Change of medication type should be considered as a new treatment episode
+- A gap of 90 days or more should be considered as a treatment interruption/discontinuation
+- Existing supply will be finished before starting a new supply of the same medication, but not for different medications
+- If the dosage recommendation changes with a new supply, existing supply will be administered according to the new dosage 
+
+```{r implementation, exercise = TRUE}
+# Calculate CMA7:
+```
+
+```{r implementation-solution}
+# Calculate CMA7:
+cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA7 to each treatment episode
+                        data=example_data,
+                        ID.colname="PATIENT_ID",
+                        event.date.colname="DATE",
+                        event.duration.colname="DURATION",
+                        event.daily.dose.colname="PERDAY",
+                        medication.class.colname="CATEGORY",
+                        carryover.within.obs.window = TRUE,
+                        carry.only.for.same.medication = FALSE,
+                        consider.dosage.change = FALSE, # conditions on treatment episodes
+                        medication.change.means.new.treatment.episode = TRUE,
+                        maximum.permissible.gap = 180,
+                        maximum.permissible.gap.unit = "days",
+                        followup.window.start=0,
+                        followup.window.start.unit = "days",
+                        followup.window.duration = 365 * 2,
+                        followup.window.duration.unit = "days",
+                        observation.window.start=0,
+                        observation.window.start.unit = "days",
+                        observation.window.duration=365*2,
+                        observation.window.duration.unit = "days",
+                        date.format="%m/%d/%Y")
+
+plot(cmaE, patients.to.plot=c("76"), show.legend=FALSE)
+```
+
+
+
+

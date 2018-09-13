@@ -1,0 +1,1049 @@
+---
+title: "AdhereR_Slides"
+author: "Samuel S. Allemann"
+date: "11 September 2018"
+output:
+  ioslides_presentation:
+    incremental: true
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(shinyWidgets)
+```
+
+## Background
+
+Estimating the *adherence to medications* from *electronic healthcare data* (EHD) has been central to research and clinical practice across clinical conditions. 
+For example, large retrospective database studies may estimate the prevalence of non-adherence in specific patient groups and model its potential predictors and impact on health outcomes, while clinicians may have access to individual patient records that flag up possible non-adherence for further clinical investigation and intervention. 
+Yet, adherence measurement is a matter of controversy. 
+
+## Methodology matters
+
+- Different adherence estimates from same data
+- Insufficiently reported algorithms
+- Lack of standardization and transparency
+- Misinformed clinical decisions
+
+((Example?))
+
+## Electronic Healthcare Data
+
+- Administrative Data
+    + Prescription databases
+    + Pharmacy databases
+    + Insurance claims
+- Typically available information
+    + Patient identifier
+    + Date of event
+    + Type of medication
+    + Quantity prescribed/dispensed/billed
+
+## AdhereR
+
+- Open-source package for the statistical software R
+- Computation of adherence from EHD
+- (Interactive) visualization
+- Transparent and reproducible reporting
+- Under active development
+
+## Assumptions
+
+- The regimen requires the use of a fixed daily dosage of medication
+- All medication supplied for that patient in that period of time is recorded
+- The patient does not use medication from other sources 
+- The medication is used by the patient it has been supplied for 
+- Medication is supposed to be supplied at least two times during the observed period 
+- Several other assumptions apply to individual algorithms
+
+## Definitions: Data source
+
+- *Medication event* = prescribing or dispensing event of a given medication for a given patient
+- *Duration* = number of days the quantity of supplied medication would last if used as recommended
+- *Quantity* = number of doses supplied at a medication event
+- *Daily dosage* = number of doses recommended to be taken daily
+- *Medication type* = classification performed by the researcher depending on study aims
+
+## Definitions: Adherence taxonomy
+
+- *Adherence* = the extent to which a patient's medication use corresponds to prescribed use, expressed as continuous multiple-interval measures of medication availability (CMA)
+- *Initiation* = the length of time between the first brescribing event and the first dispensing event
+- *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
+- *Implementation* = Adherence during periods of persistence
+
+![ABC taxonomy figure](figures/ABC_taxonomy.jpg)
+
+## Definitions: Time frames
+
+<!-- > - *Follow-up window* (FUW)  -->
+<!-- > - *Observation window* (OW)  -->
+<!-- > - *Treatment episode* (TE)  -->
+<!-- > - *Permissible gap*  -->
+
+```{r, warning=FALSE}
+library(AdhereR)
+library(data.table)
+
+example_data <- med.events[med.events$PATIENT_ID == 37, ]
+
+example_data$rownr <- 1:nrow(example_data)
+
+TEs <- compute.treatment.episodes(example_data,
+                                  ID.colname="PATIENT_ID",
+                                  event.date.colname="DATE",
+                                  event.duration.colname="DURATION",
+                                  event.daily.dose.colname="PERDAY",
+                                  medication.class.colname="CATEGORY",
+                                  carryover.within.obs.window = TRUE, # carry-over inside the OW
+                                  carry.only.for.same.medication = TRUE, # & only for same type
+                                  consider.dosage.change = TRUE, # dosage change starts new episode...
+                                  medication.change.means.new.treatment.episode = TRUE, # & type change
+                                  maximum.permissible.gap = 50, # & a gap longer than 180 days
+                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  followup.window.start = 0, # 2-years FUW starts at earliest event
+                                  followup.window.start.unit = "days",
+                                  followup.window.duration = 720,
+                                  followup.window.duration.unit = "days",
+                                  date.format = "%m/%d/%Y")
+
+cma7 <- CMA7(data=example_data, # use the two selected patients
+             ID.colname="PATIENT_ID", # the name of the column containing the IDs
+             event.date.colname="DATE", # the name of the column containing the event date
+             event.duration.colname="DURATION", # the name of the column containing the duration
+             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
+             medication.class.colname="CATEGORY", # the name of the column containing the category
+             followup.window.start=0,  # FUW start in days since earliest event
+             observation.window.start=180, # OW start in days since earliest event
+             observation.window.duration=365, # OW duration in days
+             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+
+plot(cma7,
+     show.legend = FALSE,
+     show.cma = FALSE,
+     show.event.intervals = FALSE,
+     print.CMA = FALSE,
+     plot.CMA = FALSE,
+     col.cats = c("red", "blue"))
+# for(i in 1:nrow(TEs)){
+#   id = TEs[i, "PATIENT_ID"]
+#   bottom = head(example_data[example_data$PATIENT_ID == id,"rownr"],1)
+#   top = tail(example_data[example_data$PATIENT_ID == id,"rownr"],1)
+#   start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
+#   end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
+#   
+#   rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)
+
+```
+
+
+## Working with AdhereR
+
+1. Data preparation
+2. Data exploration / Visualization
+3. Adherence calculation
+4. Reporting
+
+## Data preparation
+
+- selecting medication events applicable to the research question 
+- coding medication type depending on clinical considerations
+- calculate medication event durations (if necessary)
+- checking plausible values and correcting any deviations
+- handling missing data
+
+## Link multiple data sources
+
+- Necessary data recorded in different databases
+- Prescription changes or hospitalizations affect adherence estimation
+- New AdhereR function to:
+    1. automatically select the last prescibed dose to calculate supply duration,
+    2. check for prescription changes and hospitalizations during this period, and
+    3. adjust the supply duration based on prescription changes and hospitalizations
+
+## Data exploration/Visualization 
+
+- Exploration during preparation stage
+- Illustration for scientific communication
+- Guidance in clinical practice
+
+```{r, echo=FALSE, fig.show='hold', fig.cap = "<a name=\"Figure-1\"></a>**Figure 1.** Medication histories - two example patients"}
+# Create an object "cma0" of the most basic CMA type, "CMA0":
+example_data <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
+
+cma0 <- CMA0(data=example_data, # use the two selected patients
+             ID.colname="PATIENT_ID", # the name of the column containing the IDs
+             event.date.colname="DATE", # the name of the column containing the event date
+             event.duration.colname="DURATION", # the name of the column containing the duration
+             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
+             medication.class.colname="CATEGORY", # the name of the column containing the category
+             followup.window.start=0,  # FUW start in days since earliest event
+             observation.window.start=182, # OW start in days since earliest event
+             observation.window.duration=365, # OW duration in days
+             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+
+# Plot the object (CMA0 shows the actual event data only):
+plot(cma0, # the object to plot
+     align.all.patients=TRUE, # align all patients for easier comparison
+     col.cats = c("red", "blue")) # make colors a bit nicer
+```
+
+## Interactive Plotting
+
+```{r interactive, echo = FALSE}
+# Interactive plotting of CMA per-treatment-episode
+# Please run only within RStudio!
+
+plot_interactive_cma_shiny <- function(data=med.events[med.events$PATIENT_ID %in% c(37, 76), ],
+                                       cma.class="per episode",
+                                       ID.colname="PATIENT_ID",
+                                       event.date.colname="DATE",
+                                       event.duration.colname="DURATION",
+                                       event.daily.dose.colname="PERDAY",
+                                       medication.class.colname="CATEGORY",
+                                       date.format="%m/%d/%Y",
+                                       ID=NULL,
+                                       print.full.params=FALSE, 
+                                       followup.window.start.max=5*365,
+                                       followup.window.duration.max=5*365,
+                                       observation.window.start.max=followup.window.start.max,
+                                       observation.window.duration.max=followup.window.duration.max,
+                                       align.all.patients=FALSE, align.first.event.at.zero=TRUE,
+                                       maximum.permissible.gap.max=2*365,
+                                       sliding.window.start.max=followup.window.start.max,
+                                       sliding.window.duration.max=2*365,
+                                       sliding.window.step.duration.max=2*365,
+                                       use.system.browser=FALSE
+                                       )
+{
+  # pass things to shiny using the global environment (as discussed at https://github.com/rstudio/shiny/issues/440):
+
+  # checks:
+  if( !(cma.class %in% c("simple","per episode","sliding window")) )
+  {
+    warning(paste0("Only know how to interactively plot 'cma.class' of type 'simple', 'per episode' and 'sliding window', but you requested '",cma.class,"': assuming 'simple'."));
+    cma.class <- "simple";
+  }
+
+  # Preconditions:
+  if( !is.null(data) )
+  {
+    # data's class and dimensions:
+    if( class(data) == "matrix" ) data <- as.data.frame(data); #make it a data.frame
+    if( !inherits(data, "data.frame") )
+    {
+      stop("The 'data' must be of type 'data.frame'!\n");
+      return (NULL);
+    }
+    if( nrow(data) < 1 )
+    {
+      stop("The 'data' must have at least one row!\n");
+      return (NULL);
+    }
+    # the column names must exist in data:
+    if( !is.na(ID.colname) && !(ID.colname %in% names(data)) )
+    {
+      stop(paste0("Column ID.colname='",ID.colname,"' must appear in the 'data'!\n"));
+      return (NULL);
+    }
+    if( !is.na(event.date.colname) && !(event.date.colname %in% names(data)) )
+    {
+      stop(paste0("Column event.date.colname='",event.date.colname,"' must appear in the 'data'!\n"));
+      return (NULL);
+    }
+    if( !is.na(event.duration.colname) && !(event.duration.colname %in% names(data)) )
+    {
+      stop(paste0("Column event.duration.colname='",event.duration.colname,"' must appear in the 'data'!\n"));
+      return (NULL);
+    }
+    if( !is.na(event.daily.dose.colname) && !(event.daily.dose.colname %in% names(data)) )
+    {
+      stop(paste0("Column event.daily.dose.colname='",event.daily.dose.colname,"' must appear in the 'data'!\n"));
+      return (NULL);
+    }
+    if( !is.na(medication.class.colname) && !(medication.class.colname %in% names(data)) )
+    {
+      stop(paste0("Column medication.class.colname='",medication.class.colname,"' must appear in the 'data'!\n"));
+      return (NULL);
+    }
+  } else
+  {
+    stop("The 'data' cannot be empty!\n");
+    return (NULL);
+  }
+
+  # All patient IDs:
+  all.IDs <- sort(unique(data[,ID.colname]));
+  if( is.null(ID) || is.na(ID) || !(ID %in% all.IDs) ) ID <- all.IDs[1];
+
+  # The function encapsulating the plotting:
+  .plotting.fnc <- function(data=NULL, # the data used to compute the CMA on
+                            ID=NULL, # the ID of the patient to plot
+                            cma="none", # the CMA to use for plotting
+                            cma.to.apply="none", # cma to compute per episode or sliding window
+                            # Various types medhods of computing gaps:
+                            carryover.within.obs.window=NA, # if TRUE consider the carry-over within the observation window (NA = undefined)
+                            carryover.into.obs.window=NA, # if TRUE consider the carry-over from before the starting date of the observation window (NA = undefined)
+                            carry.only.for.same.medication=NA, # if TRUE the carry-over applies only across medication of same type (NA = undefined)
+                            consider.dosage.change=NA, # if TRUE carry-over is adjusted to reflect changes in dosage (NA = undefined)
+                            # The follow-up window:
+                            followup.window.start=NA, # if a number is the earliest event per participant date + number of units, or a Date object, or a column name in data (NA = undefined)
+                            followup.window.start.unit=NA, # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!) (NA = undefined)
+                            followup.window.duration=NA, # the duration of the follow-up window in the time units given below (NA = undefined)
+                            followup.window.duration.unit=NA, # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!)  (NA = undefined)
+                            # The observation window (embedded in the follow-up window):
+                            observation.window.start=NA, # the number of time units relative to followup.window.start (NA = undefined)
+                            observation.window.start.unit=NA, # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!) (NA = undefined)
+                            observation.window.duration=NA, # the duration of the observation window in time units (NA = undefined)
+                            observation.window.duration.unit=NA, # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!) (NA = undefined)
+                            # Treatment episodes:
+                            medication.change.means.new.treatment.episode=TRUE, # does a change in medication automatically start a new treatment episode?
+                            maximum.permissible.gap=180, # if a number, is the duration in units of max. permissible gaps between treatment episodes
+                            maximum.permissible.gap.unit="days", # time units; can be "days", "weeks" (fixed at 7 days), "months" (fixed at 30 days) or "years" (fixed at 365 days)
+                            # Sliding window:
+                            sliding.window.start=0, # if a number is the earliest event per participant date + number of units, or a Date object, or a column name in data (NA = undefined)
+                            sliding.window.start.unit=c("days", "weeks", "months", "years")[1], # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!) (NA = undefined)
+                            sliding.window.duration=90,  # the duration of the sliding window in time units (NA = undefined)
+                            sliding.window.duration.unit=c("days", "weeks", "months", "years")[1], # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!) (NA = undefined)
+                            sliding.window.step.duration=7, # the step ("jump") of the sliding window in time units (NA = undefined)
+                            sliding.window.step.unit=c("days", "weeks", "months", "years")[1], # the time units; can be "days", "weeks", "months" or "years" (if months or years, using an actual calendar!) (NA = undefined)
+                            sliding.window.no.steps=NA, # the number of steps to jump; if both sliding.win.no.steps & sliding.win.duration are NA, fill the whole observation window
+                            plot.CMA.as.histogram=TRUE, # plot the CMA as historgram or density plot?
+                            align.all.patients=FALSE, align.first.event.at.zero=TRUE, # should all patients be aligned? if so, place first event the horizontal 0?
+
+                            # Legend:
+                            show.legend=TRUE # show the legend?
+  )
+  {
+    # Progress messages:
+    cat(paste0("Plotting patient ID '",ID,"' with CMA '",cma,"'",ifelse(cma.to.apply != "none",paste0(" ('",cma.to.apply,"')"),"")));
+    if( print.full.params )
+    {
+      cat(paste0(" with params: ",
+                 "carryover.within.obs.window=",carryover.within.obs.window,", ",
+                 "carryover.into.obs.window=",carryover.into.obs.window,", ",
+                 "carry.only.for.same.medication=",carry.only.for.same.medication,", ",
+                 "consider.dosage.change=",consider.dosage.change,", ",
+                 "followup.window.start=",followup.window.start,", ",
+                 "followup.window.start.unit=",followup.window.start.unit,", ",
+                 "followup.window.duration=",followup.window.duration,", ",
+                 "followup.window.duration.unit=",followup.window.duration.unit,", ",
+                 "observation.window.start=",observation.window.start,", ",
+                 "observation.window.start.unit=",observation.window.start.unit,", ",
+                 "observation.window.duration=",observation.window.duration,", ",
+                 "observation.window.duration.unit=",observation.window.duration.unit,", ",
+                 "medication.change.means.new.treatment.episode=",medication.change.means.new.treatment.episode,", ",
+                 "maximum.permissible.gap=",maximum.permissible.gap,", ",
+                 "maximum.permissible.gap.unit=",maximum.permissible.gap.unit,", ",
+                 "sliding.window.start=",sliding.window.start,", ",
+                 "sliding.window.start.unit=",sliding.window.start.unit,", ",
+                 "sliding.window.duration=",sliding.window.duration,", ",
+                 "sliding.window.duration.unit=",sliding.window.duration.unit,", ",
+                 "sliding.window.step.duration=",sliding.window.step.duration,", ",
+                 "sliding.window.step.unit=",sliding.window.step.unit,", ",
+                 "sliding.window.no.steps=",sliding.window.no.steps,", ",
+                 "align.all.patients=",align.all.patients,", ",
+                 "align.first.event.at.zero=",align.first.event.at.zero
+      ));
+    }
+    cat("\n");
+
+    # Preconditions:
+    if( is.null(ID) || is.null(data <- data[data[,ID.colname] %in% ID,]) || nrow(data)==0 )
+    {
+      plot(-10:10,-10:10,type="n",axes=FALSE,xlab="",ylab=""); text(0,0,paste0("Error: cannot display the data for patient '",ID,"'!"),col="red");
+      return (invisible(NULL));
+    }
+
+    # Compute the CMA:
+    cma.fnc <- switch(cma,
+                      "CMA1" = CMA1,
+                      "CMA2" = CMA2,
+                      "CMA3" = CMA3,
+                      "CMA4" = CMA4,
+                      "CMA5" = CMA5,
+                      "CMA6" = CMA6,
+                      "CMA7" = CMA7,
+                      "CMA8" = CMA8,
+                      "CMA9" = CMA9,
+                      "per episode" = CMA_per_episode,
+                      "sliding window" = CMA_sliding_window,
+                      CMA0); # by default, fall back to CMA0
+    # Try to catch errors and warnings for nice displaying:
+    results <- NULL;
+    full.results <- tryCatch( results <- cma.fnc( data,
+                                                  CMA=cma.to.apply,
+                                                  ID.colname=ID.colname,
+                                                  event.date.colname=event.date.colname,
+                                                  event.duration.colname=event.duration.colname,
+                                                  event.daily.dose.colname=event.daily.dose.colname,
+                                                  medication.class.colname=medication.class.colname,
+                                                  date.format=date.format,
+                                                  carryover.within.obs.window=carryover.within.obs.window,
+                                                  carryover.into.obs.window=carryover.into.obs.window,
+                                                  carry.only.for.same.medication=carry.only.for.same.medication,
+                                                  consider.dosage.change=consider.dosage.change,
+                                                  followup.window.start=followup.window.start,
+                                                  followup.window.start.unit=followup.window.start.unit,
+                                                  followup.window.duration=followup.window.duration,
+                                                  followup.window.duration.unit=followup.window.duration.unit,
+                                                  observation.window.start=observation.window.start,
+                                                  observation.window.start.unit=observation.window.start.unit,
+                                                  observation.window.duration=observation.window.duration,
+                                                  observation.window.duration.unit=observation.window.duration.unit,
+                                                  medication.change.means.new.treatment.episode=medication.change.means.new.treatment.episode,
+                                                  maximum.permissible.gap=maximum.permissible.gap,
+                                                  maximum.permissible.gap.unit=maximum.permissible.gap.unit,
+                                                  sliding.window.start=sliding.window.start,
+                                                  sliding.window.start.unit=sliding.window.start.unit,
+                                                  sliding.window.duration=sliding.window.duration,
+                                                  sliding.window.duration.unit=sliding.window.duration.unit,
+                                                  sliding.window.step.duration=sliding.window.step.duration,
+                                                  sliding.window.step.unit=sliding.window.step.unit,
+                                                  sliding.window.no.steps=sliding.window.no.steps),
+                              error  =function(e) return(list(results=results,error=conditionMessage(e))),
+                              warning=function(w) return(list(results=results,warning=conditionMessage(w))));
+    if( is.null(results) )
+    {
+      # Plot an error message:
+      plot(-10:10,-10:10,type="n",axes=FALSE,xlab="",ylab="");
+      text(0,0,paste0("Error computing '",cma,"' for patient '",ID,"'\n(see console for possible warnings or errors)!"),col="red");
+      if( !is.null(full.results$error) )   cat(paste0("Error(s): ",paste0(full.results$error,collapse="\n")));
+      if( !is.null(full.results$warning) ) cat(paste0("Warning(s): ",paste0(full.results$warning,collapse="\n")));
+    } else
+    {
+      # Plot the results:
+      plot(results,
+           show.legend=show.legend,
+           plot.CMA.as.histogram=plot.CMA.as.histogram,
+           align.all.patients=align.all.patients,
+           align.first.event.at.zero=align.first.event.at.zero
+          );
+    }
+  }
+
+
+  # put things in the global environment for shiny:
+  .plotting.params <- list("data"=data,
+                                      "ID"=ID, "all.IDs"=all.IDs,
+                                      "cma.class"=cma.class,
+                                      "print.full.params"=print.full.params,
+                                      "ID.colname"=ID.colname,
+                                      "event.date.colname"=event.date.colname,
+                                      "event.duration.colname"=event.duration.colname,
+                                      "event.daily.dose.colname"=event.daily.dose.colname,
+                                      "medication.class.colname"=medication.class.colname,
+                                      "date.format"=date.format,
+                                      "followup.window.start.max"=followup.window.start.max,
+                                      "followup.window.duration.max"=followup.window.duration.max,
+                                      "observation.window.start.max"=observation.window.start.max,
+                                      "observation.window.duration.max"=observation.window.duration.max,
+                                      "maximum.permissible.gap.max"=maximum.permissible.gap.max,
+                                      "sliding.window.start.max"=sliding.window.start.max,
+                                      "sliding.window.duration.max"=sliding.window.duration.max,
+                                      "sliding.window.step.duration.max"=sliding.window.step.duration.max,
+                                      "align.all.patients"=align.all.patients,
+                                      "align.first.event.at.zero"=align.first.event.at.zero,
+                                      ".plotting.fnc"=.plotting.fnc
+                                     )
+  .plotting.params
+}
+
+  .plotting.params <- plot_interactive_cma_shiny()
+
+  shinyApp(
+    
+    ui <- fluidPage(
+
+
+  # Sidebar layout with input and output definitions ----
+  #sidebarLayout(
+  fluidRow(
+
+    # Sidebar panel for inputs ----
+    #sidebarPanel(
+    column(3, wellPanel(id = "tPanel", style = "overflow-y:scroll; max-height: 600px;",
+
+
+      span(h4("General settings..."), style="color:DarkBlue"),
+
+      # Select the CMA class ----
+      selectInput(inputId="cma_class",
+                  label="Select CMA type",
+                  choices=c("simple", "per episode", "sliding window"),
+                  selected=.plotting.params$cma.class),
+
+      hr(),
+
+      # Select the simple CMA to compute ----
+      selectInput(inputId="cma_to_compute",
+                  label="Select CMA to compute",
+                  choices=paste0("CMA",0:9),
+                  selected="CMA1"),
+
+      # Select the patient to plot ----
+      selectInput(inputId="patient",
+                  label="Select patient to plot",
+                  choices=.plotting.params$all.IDs,
+                  selected=.plotting.params$ID,
+                  multiple=TRUE),
+
+      hr(),
+      span(h4("Follow-up window..."), style="color:DarkBlue"),
+
+      # Follow-up window start ----
+      selectInput(inputId="followup_window_start_unit",
+                  label="Follow-up wnd. start unit",
+                  choices=c("days", "weeks", "months", "years", "calendar date"), # "column in dataset"),
+                  selected="days"),
+
+      # If follow-up window unit is "calendar date" ----
+      conditionalPanel(
+        condition = "(input.followup_window_start_unit == 'calendar date')",
+                    # Select an actual date ----
+                    dateInput(inputId="followup_window_start_date",
+                              label="Follow-up wnd. start",
+                              value=NULL, format="dd/mm/yyyy", startview="month", weekstart=1)
+      ),
+
+      ## If follow-up window unit is "column in dataset" ----
+      #conditionalPanel(
+      #  condition = "(input.followup_window_start_unit == 'column in dataset')",
+      #              # Select an actual date ----
+      #              selectInput(inputId="followup_window_start_column",
+      #                        label="Follow-up wnd. start",
+      #                        choices=names(.plotting.params$data),
+      #                        selected="")
+      #),
+
+      # If follow-up window unit is regular unit ----
+      conditionalPanel(
+        condition = "(input.followup_window_start_unit != 'calendar date')",  # && input.followup_window_start_unit != 'column in dataset')",
+                    # Select the number of units ----
+                    sliderInput(inputId="followup_window_start_no_units",
+                                label="Follow-up wnd. start",
+                                min=0, max=.plotting.params$followup.window.start.max, value=0, step=1, round=TRUE)
+      ),
+
+
+      # Follow-up window duration ----
+      selectInput(inputId="followup_window_duration_unit",
+                  label="Follow-up wnd. duration unit",
+                  choices=c("days", "weeks", "months", "years"),
+                  selected="days"),
+
+      # Select the number of units ----
+      sliderInput(inputId="followup_window_duration",
+                  label="Follow-up wnd. duration",
+                  min=0, max=.plotting.params$followup.window.duration.max, value=2*365, step=1, round=TRUE),
+
+      hr(),
+      span(h4("Observation window..."), style="color:DarkBlue"),
+
+      # Observation window start ----
+      selectInput(inputId="observation_window_start_unit",
+                  label="Observation wnd. start unit",
+                  choices=c("days", "weeks", "months", "years", "calendar date"),
+                  selected="days"),
+
+      # If observation window unit is "calendar date" ----
+      conditionalPanel(
+        condition = "(input.observation_window_start_unit == 'calendar date')",
+                    # Select an actual date ----
+                    dateInput(inputId="observation_window_start_date",
+                              label="Observation wnd. start",
+                              value=NULL, format="dd/mm/yyyy", startview="month", weekstart=1)
+      ),
+
+      # If observation window unit is not "calendar date" ----
+      conditionalPanel(
+        condition = "(input.observation_window_start_unit != 'calendar date')",
+                    # Select the number of units ----
+                    sliderInput(inputId="observation_window_start_no_units",
+                                label="Observation wnd. start",
+                                min=0, max=.plotting.params$observation.window.start.max, value=0, step=1, round=TRUE)
+      ),
+
+
+      # Observation window duration ----
+      selectInput(inputId="observation_window_duration_unit",
+                  label="Observation wnd. duration unit",
+                  choices=c("days", "weeks", "months", "years"),
+                  selected="days"),
+
+      # Select the number of units ----
+      sliderInput(inputId="observation_window_duration",
+                  label="Observation wnd. duration",
+                  min=0, max=.plotting.params$observation.window.duration.max, value=2*365, step=1, round=TRUE),
+
+      hr(),
+
+
+      # For CMA5 to CMA9: carry_only_for_same_medication, consider_dosage_change ----
+      conditionalPanel(
+        condition = "(input.cma_to_compute == 'CMA5' || input.cma_to_compute == 'CMA6' || input.cma_to_compute == 'CMA7' || input.cma_to_compute == 'CMA8' || input.cma_to_compute == 'CMA9')",
+
+                    span(h4("Carry over..."), style="color:DarkBlue"),
+
+                    # Carry-over for same treat only? ----
+                    checkboxInput(inputId="carry_only_for_same_medication",
+                                  label="Carry-over for same treat only?",
+                                  value=FALSE),
+
+                    # Consider dosage changes? ----
+                    checkboxInput(inputId="consider_dosage_change",
+                                  label="Consider dosage changes?",
+                                  value=FALSE),
+
+                    hr()
+      ),
+
+
+      # For per episode:
+      conditionalPanel(
+        condition = "(input.cma_class == 'per episode')",
+
+                    span(h4("Define the episodes..."), style="color:DarkBlue"),
+
+                    # Does treat. change start new episode? ----
+                    checkboxInput(inputId="medication_change_means_new_treatment_episode",
+                                  label="Treat. change start new episode?",
+                                  value=FALSE),
+
+                    # Max. permis. gap duration unit ----
+                    selectInput(inputId="maximum_permissible_gap_unit",
+                                label="Max. permis. gap duration unit",
+                                choices=c("days", "weeks", "months", "years"),
+                                selected="days"),
+
+                    # Max. permissible gap ----
+                    sliderInput(inputId="maximum_permissible_gap",
+                                label="Max. permissible gap",
+                                min=0, max=.plotting.params$followup.window.duration.max, value=0, step=1, round=TRUE),
+
+                    # Plot CMA as histogram ----
+                    checkboxInput(inputId="plot_CMA_as_histogram_episodes",
+                                  label="Plot CMA as histogram?",
+                                  value=FALSE),
+
+                    hr()
+      ),
+
+
+      # For sliding window:
+      conditionalPanel(
+        condition = "(input.cma_class == 'sliding window')",
+
+                    span(h4("Define the sliding windows..."), style="color:DarkBlue"),
+
+                    # Sliding window start ----
+                    selectInput(inputId="sliding_window_start_unit",
+                                label="Sliding wnd. start unit",
+                                choices=c("days", "weeks", "months", "years"),
+                                selected="days"),
+
+                    # Select the number of units ----
+                    sliderInput(inputId="sliding_window_start",
+                                label="Sliding wnd. start",
+                                min=0, max=.plotting.params$sliding.window.start.max, value=0, step=1, round=TRUE),
+
+                    # Sliding window duration ----
+                    selectInput(inputId="sliding_window_duration_unit",
+                                label="Sliding wnd. duration unit",
+                                choices=c("days", "weeks", "months", "years"),
+                                selected="days"),
+
+                    # Select the number of units ----
+                    sliderInput(inputId="sliding_window_duration",
+                                label="Sliding wnd. duration",
+                                min=0, max=.plotting.params$sliding.window.duration.max, value=90, step=1, round=TRUE),
+
+                    # Steps choice ----
+                    selectInput(inputId="sliding_window_step_choice",
+                                label="Define the sliding wnd. steps by",
+                                choices=c("the number of steps", "the duration of a step"),
+                                selected="the duration of a step"),
+
+                    # Sliding window steps
+                    conditionalPanel(
+                      condition = "(input.sliding_window_step_choice == 'the duration of a step')",
+                                  selectInput(inputId="sliding_window_step_unit",
+                                              label="Sliding wnd. step unit",
+                                              choices=c("days", "weeks", "months", "years"),
+                                              selected="days"),
+                                  sliderInput(inputId="sliding_window_step_duration",
+                                              label="Sliding wnd. step duration",
+                                              min=0, max=.plotting.params$sliding.window.duration.max, value=7, step=1, round=TRUE)
+                    ),
+                    conditionalPanel(
+                      condition = "(input.sliding_window_step_choice == 'the number of steps')",
+                                  sliderInput(inputId="sliding_window_no_steps",
+                                              label="Sliding wnd. number of steps",
+                                              min=0, max=1000, value=10, step=1, round=TRUE)
+                    ),
+
+                    # Plot CMA as histogram ----
+                    checkboxInput(inputId="plot_CMA_as_histogram_sliding_window",
+                                  label="Plot CMA as histogram?",
+                                  value=TRUE),
+
+                    hr()
+
+      ),
+
+
+      span(h4("Other..."), style="color:DarkBlue"),
+
+      # Align al patients ----
+      conditionalPanel(
+        condition="(input.patient.length > 1)",
+
+        checkboxInput(inputId="plot_align_all_patients",
+                      label="Align patients?",
+                      value=FALSE),
+
+        # Align al patients ----
+        conditionalPanel(
+          condition="input.plot_align_all_patients",
+          checkboxInput(inputId="plot_align_first_event_at_zero",
+                        label="Align 1st event at 0?",
+                        value=FALSE)
+        )
+      ),
+
+      # Show legend? ----
+      checkboxInput(inputId="show_legend",
+                  label="Show the legend?",
+                  value=TRUE)
+
+    )),
+
+
+    # Main panel for displaying outputs ----
+    #mainPanel(
+    column(9,
+
+      # Control the plot dimensions ----
+      column(3,
+        sliderInput(inputId="plot_width",
+                    label="Plot width",
+                    min=0, max=5000, value=500, step=20, round=TRUE)
+      ),
+
+      conditionalPanel(
+        condition = "(!input.plot_keep_ratio)",
+        column(3,
+          sliderInput(inputId="plot_height",
+                      label="height",
+                      min=0, max=5000, value=300, step=20, round=TRUE)
+        )
+      ),
+      conditionalPanel(
+        condition = "(input.plot_keep_ratio)",
+        column(3,
+          p("")
+        )
+      ),
+
+      column(2,
+        checkboxInput(inputId="plot_keep_ratio",
+                    label="keep ratio",
+                    value=TRUE)#,
+
+        #checkboxInput(inputId="plot_auto_size",
+        #            label="auto size",
+        #            value=TRUE)
+      ),
+
+      column(2,
+        # Save image to file:
+        checkboxInput(inputId="save_to_file_info",
+                    label="Save plot!",
+                    value=FALSE)
+      ),
+
+      column(2,
+        # Close shop:
+        actionButton(inputId="close_shop", label=strong("Exit..."), icon=icon("remove-circle", lib="glyphicon"), style="color: #C70039 ; border-color: #C70039")
+      ),
+
+      # Save to file info:
+      column(12,
+        conditionalPanel(
+          condition="(input.save_to_file_info)",
+
+          column(2,numericInput(inputId="save_plot_width", label="width", value=5)),
+          column(2,numericInput(inputId="save_plot_height", label="height", value=5)),
+
+          conditionalPanel( # EPS + PDF
+            condition="(input.save_plot_type == 'eps' || save_plot_type == 'pdf')",
+            column(2,selectInput(inputId="save_plot_dim_unit", label="unit", choices=c("in"), selected="in")) # only inches
+          ),
+          conditionalPanel( # JPEG + PNG + TIFF
+            condition="(input.save_plot_type != 'eps' && save_plot_type != 'pdf')",
+            column(2,selectInput(inputId="save_plot_dim_unit", label="unit", choices=c("in","cm","mm","px"), selected="in"))
+          ),
+
+          column(2,selectInput(inputId="save_plot_type", label="type", choices=c("jpg","png","tiff","eps","pdf"), selected="jpeg")),
+
+          #column(2,numericInput(inputId="save_plot_quality", label="quality", value=75, min=0, max=100, step=1)),
+          column(2,numericInput(inputId="save_plot_resolution", label="resolution", value=72, min=0)),
+
+          column(2, style="margin-top: 25px;", downloadButton(outputId="save_to_file", label="Save plot"))
+        )
+      ),
+
+      # Messages:
+      column(12,
+        tags$head(tags$style("#container * { display: inline; }")),
+        div(id="container", span(" Messages:", style="color:DarkBlue"), span(textOutput(outputId = "messages"), style="color:Blue"))
+      ),
+
+      # Output: the actual plot ----
+      column(12, wellPanel(id = "tPlot",
+                           style="resize: both; overflow-y:scroll; overflow-x:scroll; max-height: 800px;",
+                           plotOutput(outputId = "distPlot", inline=TRUE)))
+
+    )
+  )#,
+  #
+  #
+  #fluidRow(
+  #
+  #  # Messages:
+  #  column(12,
+  #    span(h4(" Messages:"), style="color:DarkBlue")
+  #    span(textOutput(outputId = "messages"), style="color:Blue")
+  #  )
+  #
+  #)
+
+),
+
+
+# Define server logic required to draw a histogram ----
+server <- function(input, output, session) {
+
+  # The plotting function:
+  .renderPlot <- function()
+  {
+    .plotting.params$.plotting.fnc(data=.plotting.params$data,
+                                   ID=input$patient,
+                                   cma=ifelse(input$cma_class == "simple",
+                                              input$cma_to_compute,
+                                              input$cma_class),
+                                   cma.to.apply=ifelse(input$cma_class == "simple",
+                                                       "none",
+                                                       input$cma_to_compute),
+                                   #carryover.within.obs.window=FALSE,
+                                   #carryover.into.obs.window=FALSE,
+                                   carry.only.for.same.medication=input$carry_only_for_same_medication,
+                                   consider.dosage.change=input$consider_dosage_change,
+                                   followup.window.start=ifelse(input$followup_window_start_unit== "calendar date",
+                                                                as.Date(input$followup_window_start_date, format="%Y-%m-%d"),
+                                                                as.numeric(input$followup_window_start_no_units)),
+                                   followup.window.start.unit=ifelse(input$followup_window_start_unit== "calendar date",
+                                                                     "days",
+                                                                     input$followup_window_start_unit),
+                                   followup.window.duration=as.numeric(input$followup_window_duration),
+                                   followup.window.duration.unit=input$followup_window_duration_unit,
+                                   observation.window.start=ifelse(input$observation_window_start_unit== "calendar date",
+                                                                   as.Date(input$observation_window_start_date, format="%Y-%m-%d"),
+                                                                   as.numeric(input$observation_window_start_no_units)),
+                                   observation.window.start.unit=ifelse(input$observation_window_start_unit== "calendar date",
+                                                                        "days",
+                                                                        input$observation_window_start_unit),
+                                   observation.window.duration=as.numeric(input$observation_window_duration),
+                                   observation.window.duration.unit=input$observation_window_duration_unit,
+                                   medication.change.means.new.treatment.episode=input$medication_change_means_new_treatment_episode,
+                                   maximum.permissible.gap=as.numeric(input$maximum_permissible_gap),
+                                   maximum.permissible.gap.unit=input$maximum_permissible_gap_unit,
+                                   sliding.window.start=as.numeric(input$sliding_window_start),
+                                   sliding.window.start.unit=input$sliding_window_start_unit,
+                                   sliding.window.duration=as.numeric(input$sliding_window_duration),
+                                   sliding.window.duration.unit=input$sliding_window_duration_unit,
+                                   sliding.window.step.duration=as.numeric(input$sliding_window_step_duration),
+                                   sliding.window.step.unit=input$sliding_window_step_unit,
+                                   sliding.window.no.steps=ifelse(input$sliding_window_step_choice == "the number of steps" ,as.numeric(input$sliding_window_no_steps), NA),
+                                   plot.CMA.as.histogram=ifelse(input$cma_class == "sliding window",
+                                                                !input$plot_CMA_as_histogram_sliding_window,
+                                                                !input$plot_CMA_as_histogram_episodes),
+                                   align.all.patients=input$plot_align_all_patients,
+                                   align.first.event.at.zero=input$plot_align_first_event_at_zero,
+                                   show.legend=input$show_legend # show the legend?
+    )
+  }
+
+  # Do the ploting:
+  output$distPlot <- renderPlot({
+
+      # Depeding on the CMA class we might do things differently:
+      msgs <- ""; # the output messages
+      if( input$cma_class %in% c("simple", "per episode", "sliding window") )
+      {
+        # Call the workhorse plotting function with the appropriate argumens:
+        msgs <- capture.output(.renderPlot());
+      } else
+      {
+        # Quitting....
+        showModal(modalDialog(title="AdhereR interactive plotting...", paste0("Unknwon CMA class '",input$cma_class,"'."), easyClose=TRUE));
+      }
+
+      output$messages <- renderText({
+        msgs;
+      })
+
+    },
+    width=function() # plot width
+      {
+        return (input$plot_width);
+      },
+    height=function() # plot height
+      {
+        if( !is.numeric(.plotting.params$plot.ratio) ) .plotting.params$plot.ratio <<- (input$plot_width / input$plot_height); # define the ratio
+        if( input$plot_keep_ratio )
+        {
+          return (input$plot_width / .plotting.params$plot.ratio);
+        } else
+        {
+          return (input$plot_height);
+        }
+      },
+    execOnResize=TRUE # force redrawing on resize
+  )
+
+  # Text messages:
+  output$messages <- renderText({
+    ""
+  })
+
+  observeEvent(input$plot_keep_ratio, # plot keep ratio toggle
+  {
+    if( input$plot_keep_ratio )
+    {
+      .plotting.params$plot.ratio <<- (input$plot_width / input$plot_height); # save the ratio
+    } else
+    {
+      updateSliderInput(session, "plot_height", value = round(input$plot_width / .plotting.params$plot.ratio));
+    }
+  })
+
+
+  # Export plot to file:
+  output$save_to_file <- downloadHandler(
+    filename = function(){ paste0("adherer-plot-", input$cma_class,"-", input$cma_to_compute,"-", "ID-",input$patient, ".", input$save_plot_type) },
+    content = function(file)
+    {
+      # The type of plot to save:
+      if( input$save_plot_type == "png" )
+      {
+        png(file, height=input$save_plot_width, width=input$save_plot_height, units=input$save_plot_dim_unit, res=input$save_plot_resolution);
+      } else if( input$save_plot_type == "tiff" )
+      {
+        tiff(file, height=input$save_plot_width, width=input$save_plot_height, units=input$save_plot_dim_unit, res=input$save_plot_resolution);
+      } else if( input$save_plot_type == "eps" )
+      {
+        postscript(file, height=input$save_plot_width, width=input$save_plot_height, horizontal=FALSE, onefile=FALSE, paper="special");
+      } else if( input$save_plot_type == "pdf" )
+      {
+        pdf(file, height=input$save_plot_width, width=input$save_plot_height, horizontal=FALSE, onefile=FALSE, paper="special");
+      } else # default to JPEG
+      {
+        jpeg(file, height=input$save_plot_width, width=input$save_plot_height, units=input$save_plot_dim_unit, res=input$save_plot_resolution);
+      }
+
+      # Plot it:
+      .renderPlot();
+
+      # Close the device:
+      dev.off();
+    }
+  )
+
+
+
+  # Close shop nicely:
+  observeEvent(input$close_shop,
+  {
+    showModal(modalDialog(title="AdhereR interactive plotting...", "Are you sure you want to close the interactive plotting?",
+                          footer = tagList(modalButton("No", icon=icon("remove-circle", lib="glyphicon")),
+                                           actionButton("ok", "Yes", icon=icon("ok-circle", lib="glyphicon")))))
+  })
+  observeEvent(input$ok,
+  {
+    removeModal();
+    stopApp();
+  })
+
+}
+    
+  )
+```
+
+## Adherence estimation
+
+* `AdhereR` estimates adherence as *Continuous Medication Availability* (CMA)
+* *simple* CMA measures: `CMA1` - `CMA9`
+    + Delimination of OW,
+    + Capping of CMA values,
+    + Carry-over of medication oversupply within the OW, and 
+    + Carry-over of medication supply into OW.
+* *iterated* CMA measures: `CMA_per_episode` and `CMA_sliding_window`
+
+## Persistence
+
+> - differentiate between persistence with treatment and quality of implementation 
+
+```{r}
+plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
+```
+
+## Persistence -- treatment episodes
+
+```{r, echo = FALSE}
+example_data$rownr <- 1:nrow(example_data)
+dropdownButton(
+ 
+  checkboxInput(inputId = "carry_within", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change", label = "Consider dosage change", value = TRUE),
+  checkboxInput(inputId = "new_episode", label = "New episode after medication change", value = TRUE),
+    sliderInput("max_gap", label = "Maximum permissible gap:",
+              min = 30, max = 360, value = 90, step = 5),
+
+  icon = icon("gear"),
+  width = "300px"
+  )
+
+renderPlot({
+  TEs <- compute.treatment.episodes(example_data,
+                                  ID.colname="PATIENT_ID",
+                                  event.date.colname="DATE",
+                                  event.duration.colname="DURATION",
+                                  event.daily.dose.colname="PERDAY",
+                                  medication.class.colname="CATEGORY",
+                                  carryover.within.obs.window = input$carry_within, # carry-over inside the OW
+                                  carry.only.for.same.medication = input$carry_same, # & only for same type
+                                  consider.dosage.change = input$dose_change, # dosage change starts new episode...
+                                  medication.change.means.new.treatment.episode = input$new_episode, # & type change
+                                  maximum.permissible.gap = as.numeric(input$max_gap), # & a gap longer than 180 days
+                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  followup.window.start = 0, # 2-years FUW starts at earliest event
+                                  followup.window.start.unit = "days",
+                                  followup.window.duration = 720,
+                                  followup.window.duration.unit = "days",
+                                  date.format = "%m/%d/%Y")
+
+  plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
+    for(i in 1:nrow(TEs)){
+  id = TEs[i, "PATIENT_ID"]
+  bottom = head(example_data[example_data$PATIENT_ID == id,"rownr"],1)
+  top = tail(example_data[example_data$PATIENT_ID == id,"rownr"],1)
+  start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
+  end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
+  
+  rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)}
+  })
+```
+
+
