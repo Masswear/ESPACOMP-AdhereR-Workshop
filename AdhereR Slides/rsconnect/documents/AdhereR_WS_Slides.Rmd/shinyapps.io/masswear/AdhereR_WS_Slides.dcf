@@ -1,0 +1,12 @@
+name: AdhereR_WS_Slides
+title: AdhereR_WS_Slides
+username:
+account: masswear
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 441743
+bundleId: 1584975
+url: https://masswear.shinyapps.io/AdhereR_WS_Slides/
+when: 1536900991.23125
+asMultiple: FALSE
+asStatic: FALSE

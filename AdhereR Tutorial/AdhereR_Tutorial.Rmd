@@ -24,10 +24,12 @@ Please contact us with suggestions, bug reports, comments (or even just to share
 ```{r quiz-1}
 quiz(
   question("Which data can be used to estimate adherence with the AdhereR package?",
+    answer("Prescription data", correct = TRUE),
     answer("Pharmacy records", correct = TRUE),
     answer("MEMS data"),
     answer("Insurance claims", correct = TRUE),
-    answer("Self-report")
+    answer("Self-report"),
+    incorrect = "At the moment, AdhereR only works with administrative data, such as prescription or dispensing records and insurance claims."
   )
 )
 ```
@@ -46,7 +48,8 @@ quiz(
     answer("Event date", correct = TRUE),
     answer("Daily dosage"),
     answer("Medication type"),
-    answer("Supply duration", correct = TRUE)
+    answer("Supply duration", correct = TRUE),
+    incorrect = "Daily dosage and Medication type is optional and only required for some algorithms."
   )
 )
 ```
@@ -425,6 +428,7 @@ Use the `CMA_per_episode()` function to compute CMA7 during the implementation p
 
 ```{r implementation, exercise = TRUE}
 # Calculate CMA7:
+
 ```
 
 ```{r implementation-solution}

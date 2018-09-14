@@ -1,7 +1,7 @@
 ---
-title: "AdhereR_Slides"
-author: "Samuel S. Allemann"
-date: "11 September 2018"
+title: "AdhereR: Estimate Adherence from Electronic Healthcare Data"
+author: "Samuel S. Allemann, Alexandra L. Dima"
+date: "28 November 2018"
 output:
   ioslides_presentation:
     incremental: true
@@ -15,18 +15,11 @@ library(shinyWidgets)
 
 ## Background
 
-Estimating the *adherence to medications* from *electronic healthcare data* (EHD) has been central to research and clinical practice across clinical conditions. 
-For example, large retrospective database studies may estimate the prevalence of non-adherence in specific patient groups and model its potential predictors and impact on health outcomes, while clinicians may have access to individual patient records that flag up possible non-adherence for further clinical investigation and intervention. 
-Yet, adherence measurement is a matter of controversy. 
-
-## Methodology matters
-
-- Different adherence estimates from same data
-- Insufficiently reported algorithms
-- Lack of standardization and transparency
-- Misinformed clinical decisions
-
-((Example?))
+- Adherence estimations based on *Electronic healthcare data* (EHD) are central to research and clinical practice across clinical conditions
+    + Estimate prevalence of (non-)adherence
+    + Identify predictors of (non-)adherence
+    + Model impact of adherence on clinical outcomes
+    + Identify individuals with suboptimal adherence for targeted interventions
 
 ## Electronic Healthcare Data
 
@@ -39,6 +32,14 @@ Yet, adherence measurement is a matter of controversy.
     + Date of event
     + Type of medication
     + Quantity prescribed/dispensed/billed
+    
+## Methodology matters
+
+- Different adherence estimates from same data
+- Insufficiently reported algorithms
+- Lack of standardization and transparency
+- Misinformed clinical decisions
+- ((Example?))
 
 ## AdhereR
 
@@ -72,7 +73,7 @@ Yet, adherence measurement is a matter of controversy.
 - *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
 - *Implementation* = Adherence during periods of persistence
 
-![ABC taxonomy figure](figures/ABC_taxonomy.jpg)
+![ABC taxonomy figure adapted for EHD](figures/ABC_taxonomy_EHD.jpg)
 
 ## Definitions: Time frames
 
@@ -161,11 +162,11 @@ plot(cma7,
     2. check for prescription changes and hospitalizations during this period, and
     3. adjust the supply duration based on prescription changes and hospitalizations
 
-## Data exploration/Visualization 
+## Data exploration/Visualization {.build}
 
-- Exploration during preparation stage
-- Illustration for scientific communication
-- Guidance in clinical practice
+> - Exploration during preparation stage
+> - Illustration for scientific communication
+> - Guidance in clinical practice
 
 ```{r, echo=FALSE, fig.show='hold', fig.cap = "<a name=\"Figure-1\"></a>**Figure 1.** Medication histories - two example patients"}
 # Create an object "cma0" of the most basic CMA type, "CMA0":
@@ -990,6 +991,16 @@ server <- function(input, output, session) {
     + Carry-over of medication supply into OW.
 * *iterated* CMA measures: `CMA_per_episode` and `CMA_sliding_window`
 
+## Overall adherence
+
+- No difference between implementation and persistence
+- ...
+
+## Initiation
+
+- Requires prescription and dispensing data - `medication_match()` function
+- ...
+
 ## Persistence
 
 > - differentiate between persistence with treatment and quality of implementation 
@@ -1045,5 +1056,18 @@ renderPlot({
   rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)}
   })
 ```
+
+## Implementation
+
+- CMA per episode
+- ...
+
+## Longitudinal analysis
+
+- slinding windows...
+
+## Take home messages
+
+- ...
 
 
