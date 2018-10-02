@@ -1,6 +1,6 @@
 ---
 title: "Electronic healthcare data analysis for medication adherence with AdhereR"
-author: "Alexandra L. Dima, Dan Dediu & Samuel S. Allemann"
+author: "Alexandra L. Dima, Samuel S. Allemann & Dan Dediu"
 date: "`r Sys.Date()`"
 fig_caption: yes
 ---
@@ -50,7 +50,7 @@ if (!require("AdhereR")) install.packages("AdhereR")
 if (!require("data.table")) install.packages("data.table")
 
 # Load example dataset
-disp_events <- fread("example_disp_events.csv")
+disp_events <- fread("./AdhereR Tutorial/data/example_disp_events.csv")
 # Display the first patient as pretty markdown table:
 knitr::kable(disp_events[PATIENT.ID == 42], caption = "<a name=\"Table-1\"></a>**Table 1.** Medication events for one example patient");
 ```
@@ -110,7 +110,7 @@ To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, bu
 ```{r, echo=TRUE, results='asis'}
 # Load example prescription data:
 
-load("example_presc_events.RData")
+load("./AdhereR Tutorial/data/example_presc_events.RData")
 
 str(presc_events)
 
@@ -713,7 +713,7 @@ plot_interactive_cma(data=med.events[med.events$PATIENT_ID %in% c(37, 76), ],
                      date.format="%m/%d/%Y");
 ```
 
-![<a name="Figure-14"></a>**Figure 14.** Interactive plotting within `RStudio` (screenshot).](./interactive-plotting.jpg "Interactive plotting (screenshot)")
+![<a name="Figure-14"></a>**Figure 14.** Interactive plotting within `RStudio` (screenshot).](./AdhereR Tutorial/figures/interactive-plotting.jpg "Interactive plotting (screenshot)")
 
 ## Technical details
 
