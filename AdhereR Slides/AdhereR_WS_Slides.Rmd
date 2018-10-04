@@ -1101,11 +1101,11 @@ renderPlot({
 example_data$rownr <- 1:nrow(example_data)
 dropdownButton(
  
-  checkboxInput(inputId = "carry_within", label = "Carry-over within OW", value = FALSE),
-  checkboxInput(inputId = "carry_same", label = "Carry-over only for same medication", value = FALSE),
-  checkboxInput(inputId = "dose_change", label = "Consider dosage change", value = TRUE),
-  checkboxInput(inputId = "new_episode", label = "New episode after medication change", value = TRUE),
-    sliderInput("max_gap", label = "Maximum permissible gap:",
+  checkboxInput(inputId = "carry_within1", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same1", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = TRUE),
+  checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = TRUE),
+    sliderInput("max_gap1", label = "Maximum permissible gap:",
               min = 30, max = 360, value = 90, step = 5),
 
   icon = icon("gear"),
@@ -1121,11 +1121,11 @@ renderPlot({
                         event.duration.colname="DURATION",
                         event.daily.dose.colname="PERDAY",
                         medication.class.colname="CATEGORY",
-                        carryover.within.obs.window = input$carry_within,
-                        carry.only.for.same.medication = input$carry_same,
-                        consider.dosage.change = input$dose_change, # conditions on treatment episodes
-                        medication.change.means.new.treatment.episode = input$new_episode,
-                        maximum.permissible.gap = as.numeric(input$max_gap),
+                        carryover.within.obs.window = input$carry_within1,
+                        carry.only.for.same.medication = input$carry_same1,
+                        consider.dosage.change = input$dose_change1, # conditions on treatment episodes
+                        medication.change.means.new.treatment.episode = input$new_episode1,
+                        maximum.permissible.gap = as.numeric(input$max_gap1),
                         maximum.permissible.gap.unit = "days",
                         followup.window.start=0,
                         followup.window.start.unit = "days",
@@ -1152,9 +1152,9 @@ renderPlot({
 example_data$rownr <- 1:nrow(example_data)
 dropdownButton(
  
-  checkboxInput(inputId = "carry_within", label = "Carry-over within OW", value = FALSE),
-  checkboxInput(inputId = "carry_same", label = "Carry-over only for same medication", value = FALSE),
-  checkboxInput(inputId = "dose_change", label = "Consider dosage change", value = TRUE),
+  checkboxInput(inputId = "carry_within2", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same2", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change2", label = "Consider dosage change", value = TRUE),
 sliderInput("SW_dur", label = "Sliding window duration:",
               min = 1, max = 360, value = 90, step = 5),
 sliderInput("SW_step", label = "Sliding window step:",
@@ -1172,9 +1172,9 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
                            event.duration.colname="DURATION",
                            event.daily.dose.colname="PERDAY",
                            medication.class.colname="CATEGORY",
-                           carryover.within.obs.window = input$carry_within,
-                        carry.only.for.same.medication = input$carry_same,
-                        consider.dosage.change = input$dose_change, 
+                           carryover.within.obs.window = input$carry_within2,
+                        carry.only.for.same.medication = input$carry_same2,
+                        consider.dosage.change = input$dose_change2, 
                            followup.window.start=0,
                            observation.window.start=0,
                            observation.window.duration=365*2,
