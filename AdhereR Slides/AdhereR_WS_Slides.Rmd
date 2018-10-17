@@ -70,7 +70,10 @@ Electronic healthcare data (EHD):
 - Insufficiently reported algorithms
 - Lack of standardization and transparency
 - Misinformed clinical decisions
-- ((Example?))
+
+example: 
+method-related variation in adherence to sibutramine 63 - 109.7%
+(Hess et al., 2006)
 
 ## AdhereR
 
@@ -100,7 +103,7 @@ Electronic healthcare data (EHD):
 ## Definitions: Adherence taxonomy
 
 - *Adherence* = the extent to which a patient's medication use corresponds to prescribed use, expressed as continuous multiple-interval measures of medication availability (CMA)
-- *Initiation* = the length of time between the first brescribing event and the first dispensing event
+- *Initiation* = the length of time between the first prescribing event and the first dispensing event
 - *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
 - *Implementation* = Adherence during periods of persistence
 
@@ -111,9 +114,8 @@ Electronic healthcare data (EHD):
 > - *Follow-up window* (FUW)
 > - *Observation window* (OW)
 > - *Treatment episode* (TE)
-> - *Permissible gap*
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, fig.height=4}
 library(AdhereR)
 library(data.table)
 
@@ -1032,7 +1034,10 @@ server <- function(input, output, session) {
 ## Initiation
 
 - Requires prescription and dispensing data - `medication_match()` function
-- ...
+
+- yes/no - availability of a dispensing date (within a period of time after prescription)
+- time to dispensing - `difftime(dispensing date, prescribing date, units="days")` 
+
 
 ## Persistence
 
@@ -1042,7 +1047,7 @@ server <- function(input, output, session) {
 plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
 ```
 
-## Persistence
+## Persistence 
 
 > - treatment episodes depend on max permissible gap
 
@@ -1092,9 +1097,37 @@ renderPlot({
   })
 ```
 
+## Persistence output
+
+```{r, echo=FALSE, results='asis', }
+# Compute the treatment episodes for the two patients:
+ExamplePats <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
+
+TEs3<- compute.treatment.episodes(ExamplePats,
+                                  ID.colname="PATIENT_ID",
+                                  event.date.colname="DATE",
+                                  event.duration.colname="DURATION",
+                                  event.daily.dose.colname="PERDAY",
+                                  medication.class.colname="CATEGORY",
+                                  carryover.within.obs.window = TRUE, # carry-over into the OW
+                                  carry.only.for.same.medication = TRUE, # & only for same type
+                                  consider.dosage.change = TRUE, # dosage change starts new episode...
+                                  medication.change.means.new.treatment.episode = TRUE, # & type change
+                                  maximum.permissible.gap = 180, # & a gap longer than 180 days
+                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  followup.window.start = 0, # 2-years FUW starts at earliest event
+                                  followup.window.start.unit = "days",
+                                  followup.window.duration = 365 * 2,
+                                  followup.window.duration.unit = "days",
+                                  date.format = "%m/%d/%Y");
+knitr::kable(
+  TEs3, table.attr = "style='width:30%;'", 
+             caption = "<a name=\"Table-2\"></a>**Table 2.** Example output `compute.treatment.episodes()` function");
+```
+
 ## Implementation
 
-- CMA per episode
+> - CMA per episode
 
 ```{r, echo = FALSE}
 
@@ -1143,9 +1176,9 @@ renderPlot({
   })
 ```
 
-## Longitudinal analysis
+## Longitudinal analysis 
 
-- sliding windows - vary OW duration & lag
+> - sliding windows - vary OW duration & lag
 
 ```{r, echo = FALSE}
 
@@ -1203,3 +1236,6 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
 - ...
 
 
+## Practical session(s)
+
+- ...
