@@ -1,6 +1,6 @@
 ---
 title: "Electronic healthcare data analysis for medication adherence with AdhereR"
-author: "Alexandra L. Dima, Dan Dediu & Samuel S. Allemann"
+author: "Alexandra L. Dima, Samuel S. Allemann & Dan Dediu"
 date: "`r Sys.Date()`"
 fig_caption: yes
 ---
@@ -12,7 +12,7 @@ It contains a set of `R` `S3` *classes* and *functions* that *compute*, *summari
 
 This tutorial aims to introduce researchers to the principles of EHD preparation required to estimate adherence with the AdhereR package. It uses example data to illustrate the various decisions required and their impact on estimates, starting with the visualization of medication events, computation of persistence (treatment episode length), and computation of adherence.
 
-Please contact us with suggestions, bug reports, comments (or even just to share your experiences using the package) either by e-mail (to Dan <ddediu@gmail.com>, Alexandra <alexadima@gmail.com> or Samuel (samuel.allemann@gmx.ch)) or using GitHub's reporting mechanism at our repository <https://github.com/ddediu/AdhereR>, which contains the full source code of the package. 
+Please contact us with suggestions, bug reports, comments (or even just to share your experiences using the package) either by e-mail (to Dan <ddediu@gmail.com>, Alexandra <alexadima@gmail.com> or Samuel <samuel.allemann@gmx.ch>) or using GitHub's reporting mechanism at our repository <https://github.com/ddediu/AdhereR>, which contains the full source code of the package. 
 
 ## Data preparation and example dataset 
 
@@ -48,25 +48,25 @@ Suppose you have a dataset with the following information:
 # Load the AdhereR and data.table libraries (and install if not already installed):
 if (!require("AdhereR")) install.packages("AdhereR")
 if (!require("data.table")) install.packages("data.table")
-
+library(shinyWidgets)
 # Load example dataset
-disp_events <- fread("example_disp_events.csv")
+disp_events <- fread("./AdhereR Tutorial/data/example_disp_events.csv")
 # Display the first patient as pretty markdown table:
 knitr::kable(disp_events[PATIENT.ID == 42], caption = "<a name=\"Table-1\"></a>**Table 1.** Medication events for one example patient");
 ```
 
 ### Data cleaning
 
-First, we have to make sure that the data is in the right format. We can use the function `str()` to check the format of our variables and `summary()` for a first plausibility check.
+First, we have to make sure that the data are in the right format. We can use the function `str()` to check the format of our variables and `summary()` for a first plausibility check.
 
 ```{r, echo=TRUE, results='asis'}
 # Check format of variables:
 str(disp_events)
 ```
 
-We can see that the `DATE.DISP` column is in *CHARACTER* instead of *DATE* format, and the `DOSE` is in *CHARACTER* format, too, because the unit is appended to it. 
+We can see that the `DATE.DISP` column is in *CHARACTER* instead of *DATE* format, and the *DOSE* is in *CHARACTER* format, too, because the unit is appended to it. 
 
-We convert the `DATE.DISP`to the appropriate format and extract the numeric part and the characters from the `DOSE`variable into separate variables `DOSE.num`and `UNIT`. In addition, we convert the ATC-Code `ATC.CODE` to a factor variable. Let's also convert the `DOSE.num` variable to *NUMERIC* and the `UNIT` variable to *FACTOR* to make sure that we have the same unit for all rows.
+We convert the `DATE.DISP` to the appropriate format and extract the numeric part and the characters from the `DOSE` variable into separate variables `DOSE.num` and `UNIT`. In addition, we convert the ATC-Code `ATC.CODE` to a factor variable. Let's also convert the `DOSE.num` variable to *NUMERIC* and the `UNIT` variable to *FACTOR* to make sure that we have the same unit for all rows.
 
 ```{r, echo=TRUE, results='asis'}
 # Convert DATE to the DATE format and split DOSE into two variables:
@@ -89,17 +89,18 @@ str(disp_events)
 
 # Check summary of variables:
 summary(disp_events)
+
 ```
 
-Now that the data is in the right format, we can see if there are any implausible or missing data from the summary.
-We can see that all the dates appear to be from the years 2014-2016, which corresponds with our intended follow-up window. There are 31 different medications (as seen from the 31 factor levels of the `ATC.CODE`variable). There are 4 different units in the `UNIT` variable: *MG*, *MCG*, *MICROG*, and *UI*. *MCG* and *MICROG* both refer to the same unit, microgrammes, so there should be only one version of this unit. We could change the original data and replace all instances of *MCG* with *MICROG*, but one of the data cleaning principles is to never change the original data. Instead, we will modify the data transparently and reproducibly in our script. If there are a lot of modificiations, this could be in a separate file that contains only the modifications.
+Now that the data are in the right format, we can see if there are any implausible or missing data from the summary.
+We can see that all the dates appear to be from the years 2014-2016, which corresponds with our intended follow-up window. There are 31 different medications (as seen from the 31 factor levels of the `ATC.CODE` variable). There are 4 different units in the `UNIT` variable: *MG*, *MCG*, *MICROG*, and *UI*. *MCG* and *MICROG* both refer to the same unit, microgrammes, so there should be only one version of this unit. We could change the original data and replace all instances of *MCG* with *MICROG*, but one of the data cleaning principles is to never change the original data. Instead, we will modify the data transparently and reproducibly in our script. If there are a lot of modifications, these could be placed in a separate file that contains only the modifications.
 
 ```{r, echo=TRUE, results='asis'}
 # Assign *MCG* and *MICROG* to the same factor level
 levels(disp_events$UNIT) <- list(MICROG=c("MCG", "MICROG"), MG="MG", UI="UI")
 ```
 
-To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, but we only have the quantity. We could assume that patients need to administer one unit per day and use the `QUANTITY` variable, but for the medication of interest, this is clearly not appropriate. Sometimes, standard doses, e.g. WHO's 'Defined Daily Dose' or other assumptions may be appropriate in some instances, but might introduce bias in other situations. For this example, we have a second database where the prescribed dosage for each medication per patient is recorded: 
+To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, but in this example we only have the quantity. We could assume that patients need to administer one unit per day and use the `QUANTITY` variable, but for the medication of interest, this is clearly not appropriate. Sometimes, standard doses, e.g. WHO's 'Defined Daily Dose' or other assumptions may be appropriate in some instances, but might introduce bias in other situations. For this example, we could have a second database where the prescribed dosage for each medication per patient is recorded: 
 
 - patient unique identifier (`PATIENT.ID`), 
 - event date (`DATE.PRESC`; date of prescription, in the "mm/dd/yyyy" format),
@@ -110,7 +111,7 @@ To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, bu
 ```{r, echo=TRUE, results='asis'}
 # Load example prescription data:
 
-load("example_presc_events.RData")
+load("./AdhereR Tutorial/data/example_presc_events.RData")
 
 str(presc_events)
 
@@ -118,9 +119,9 @@ summary(presc_events)
 
 ```
 
-Conveniently, this dataset is already clean and all the data is in the right format. Moreover, there is only one prescription event per medication, which occured before the first dispensing event, so we don't have to deal with prescription changes during our follow-up period.
+Conveniently, this dataset is already clean and all the data are in the right format. Moreover, there is only one prescription event per medication, which occurred before the first dispensing event, so we don't have to deal with prescription changes during our follow-up period.
 
-We can now merge the two datasets and calculate the duration for each dispensing event. We merge by `PATIENT.ID`, `ATC.CODE` code and `UNIT` to make sure that events are matched correctly. This is why it was necessary to clean up the units: Otherwise, some events might not merge correctly due to mismatches between the units. By default, the `merge` function only includes rows where the ID-variable are present in both instances. This means that we only capture medications that were prescribed and at least once dispensed during the follow-up period. If we want to capture all events, we can specify `all = TRUE` in the function arguments: 
+We can now merge the two datasets and calculate the duration for each dispensing event. We merge by `PATIENT.ID`, `ATC.CODE` code and `UNIT` to make sure that events are matched correctly. This is why it was necessary to clean up the units. Otherwise, some events might not merge correctly due to mismatches between the units. By default, the `merge` function only includes rows where the ID-variable is present in both instances. This means that we only capture medications that were prescribed and at least once dispensed during the follow-up period. If we want to capture all events, we can specify `all = TRUE` in the function arguments: 
 
 ```{r, echo=TRUE, results='asis'}
 # Merge dispensing and prescription data:
@@ -134,7 +135,7 @@ summary(med_events)
 
 ```
 
-When assessing adherence in clinical practice over an extended period of time, unlike in our example, there will be many events affecting adherence estimation, such as prescription changes or hospitalizations. These data are increasingly available for research, but can be tricky to process correctly. In its newest version, `AdhereR` now offers a function to link dispensing, prescription, and hospitalization data to improve the accuracy of adherence estimation. For each dispensing event, it automatically selects the last prescibed dose to calculate supply duration, checks for prescription changes and hospitalizations during this period, and adjusts the duration accordingly. It requires the following input:
+When assessing adherence in clinical practice over an extended period of time, unlike in our example, there will be many events affecting adherence estimations, such as prescription changes or hospitalizations. These data are increasingly available for research, but can be tricky to process correctly. In its newest version, `AdhereR` offers a function to link dispensing, prescription, and hospitalization data to improve the accuracy of adherence estimations. For each dispensing event, it automatically selects the last prescribed dose to calculate supply duration, checks for prescription changes and hospitalizations during this period, and adjusts the duration accordingly. It requires the following input:
 
 - `x` : A *data.frame* with the dispensing data
 - `y` : A *data.frame* with the prescription data
@@ -154,7 +155,7 @@ When assessing adherence in clinical practice over an extended period of time, u
 - `force.presc.renew` : *logical*, default *TRUE*; if a medication has not been prescribed during a prescription event, should its prescription end on this date?
 - `consider.dosage.change` : *logical*, default *TRUE*; should the supply duration be recalculated in case of prescription changes?
 
-Because hospitalization data is optional, we can use this function with our example datasets: 
+Because hospitalization data are optional, we can use this function with our example datasets: 
 
 ```{r, echo=TRUE, results='asis'}
 # Merge dispensing and prescription data with AdhereR's medication_match function:
@@ -180,6 +181,7 @@ str(NULL)
 summary(NULL)
 
 ```
+
 ## Visualization of patient records
 
 A first step towards deciding which algorithm is appropriate for these data is to explore medication histories visually. 
@@ -245,7 +247,7 @@ They also agree that a minumum of 6 months (180 days) need to pass after the end
 We will specify this as `maximum.permissible.gap = 180`, and `maximum.permissible.gap.unit = "days"`. 
 (If in another scenario the clinical information we obtain suggests that the permissible gap should depend on the duration of the last supply, for example 6 times that interval should go by before a discontinuation becoming likely, we can specify this as `maximum.permissible.gap = 600`, and `maximum.permissible.gap.unit = "percent"`.)
 
-We might also have some clinical confirmation that usually people finish existing supply before starting the new one (`carryover.within.obs.window = TRUE`), but of course only for the same medication if `medA` and `medB` are supplied with a recommendation to start a new treatment immediately (`carry.only.for.same.medication = TRUE`), take the existing supply based on the new dosage recommendations if these change (`consider.dosage.change = TRUE`).
+We might also have some clinical confirmation that usually people finish the existing supply before starting the new one (`carryover.within.obs.window = TRUE`), but of course only for the same medication if `medA` and `medB` are supplied with a recommendation to start a new treatment immediately (`carry.only.for.same.medication = TRUE`), take the existing supply based on the new dosage recommendations if these change (`consider.dosage.change = TRUE`).
 
 The rest of the parameters specify the name of the dataset (here `ExamplePats`), names of the variables in the dataset (here based on the demo dataset, described above), and the FUW (here the whole 2-year window).
 
@@ -350,150 +352,16 @@ We implemented them in `AdhereR` based on the authors' description, and in essen
 3) whether medication oversupply is carried over to the next event interval, and 
 4) whether medication available before a first event is considered in supply calculations or OW definition.
 
-#### CMA1
-*CMA1* is the simplest method, often described in the literature as the *medication possession ratio* (MPR). 
-It simply adds up the duration of all medication events within the OW, excluding the last event, and divides this by the number of days between the first and last event (multiplied by 100 to obtain a percentage). 
-Thus, it can be higher than 1 (or 100% adherence) and, if the OW does not start and end with a medication event for all patients, it can actually refer to different lengths of time within the OW for different patients. 
-For example, for patient `76` below CMA1 is computed for the period starting with the first event in the highlighted interval and ending at the date if the last event -- thus, it considers only 4 events with considerable overlaps and results in a CMA1 of 140%, indicating overuse.
-
-Creating an object of class `CMA1` with various parameters automatically performs the estimation of CMA1 for all the patients in the dataset; moreover, the object is smart enough to allow the appropriate printing and plotting.
-The object includes all the parameter values with which it was created, as well as the `CMA` `data.frame`, which is the main result, with two columns: patient ID and the corresponding CMA estimate. 
-The CMA estimates appear as ratios, but can be trivially transformed into percentages and rounded, as we did for patient `76` below (rounded to 2 decimals). 
-The plots show the CMA as percentage rounded to 1 decimal.
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-2\"></a>**Figure 2.** Simple CMA 1", fig.height=5, fig.width=7}
-# Create the CMA1 object with the given parameters:
-cma1 <- CMA1(data=ExamplePats,
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-# Display the summary:
-cma1
-# Display the estimated CMA table:
-cma1$CMA
-# and equivalently using an accessor function:
-getCMA(cma1);
-# Compute the CMA value for patient 76, as percentage rounded at 2 digits:
-round(cma1$CMA[cma1$CMA$PATIENT_ID== 76, 2]*100, 2)
-# Plot the CMA:
-# The legend shows the actual duration, the days covered and gap days, 
-# the drug (medication) type, the FUW and OW, and the estimated CMA.
-plot(cma1, 
-     patients.to.plot=c("76"), # plot only patient 76 
-     legend.x=520); # place the legend in a nice way
-```
-
-#### CMA2
-Thus, CMA1 assumes that there is a treatment episode within the OW (shorter or equal to the OW) when the patient used the medication, and every new medication event happened when the previous supply finished (possibly due to overuse). 
-These assumptions rarely fit with real life use patterns. 
-One limitation is not considering the last event -- which represents almost a half of the OW in the case of patient `76`. 
-
-To address this limitation, *CMA2* includes the duration of the last event in the numerator and the period from the last event to the end of the OW in the denominator. 
-Thus, the estimate [Figure 3](#Figure-3) is 77.9%, more in line with the medication history of this patient in the year after the intervention.
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-3\"></a>**Figure 3.** Simple CMA 2", fig.height=5, fig.width=7}
-cma2 <- CMA2(data=ExamplePats, # we're estimating CMA2 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-plot(cma2, 
-     patients.to.plot=c("76"),  
-     show.legend=FALSE); # don't show legend to avoid clutter (see above)
-```
-
-#### CMA3 and CMA4
-Both CMA1 and CMA2 can be higher that 1 (100% adherence) based on the assumption that medication supply is finished until the last event (CMA1) or the end of the OW (CMA2).
-But sometimes this is not plausible, because patients can refill their supply earlier (for example when going on holidays) and overuse is a less frequent behaviour for some medications (when side effects are considerable for overuse, or medications are expensive). 
-Or it may be that it does not matter whether patients use 100% or more that 100% of their medication, the therapeutic effect is the same with no risks or side effects.
-Again, this is a matter of inquiry to the advisory committee or investigation in the target population.
-
-If it is likely that implementation does not exceed 100% (or does not make a difference if it does), *CMA3* and *CMA4* below adjust for this by capping CMA1 and CMA2 respectively to 100%. 
-As shown in [Figures 4](#Figure-4) and [5](#Figure-5), CMA3 is now capped at 100%, and CMA4 remains the same as CMA2 (because it was already lower than 100%). 
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-4\"></a>**Figure 4.** Simple CMA 3", fig.height=5, fig.width=7}
-cma3 <- CMA3(data=ExamplePats, # we're estimating CMA3 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-plot(cma3, patients.to.plot=c("76"), show.legend=FALSE);
-```
-
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-5\"></a>**Figure 5.** Simple CMA 4", fig.height=5, fig.width=7}
-cma4 <- CMA4(data=ExamplePats, # we're estimating CMA4 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-plot(cma4,patients.to.plot=c("76"), show.legend=FALSE);
-```
-
-#### CMA5 and CMA6
-All CMAs from 1 to 4 have a major limitation: they don't take into account the *timing* of the events. 
-But if there is a large gap between two events it is more likely that the person had used the medication less than prescribed at least in part of that interval. 
-Just capping the values as in CMA3 and CMA4 does not account for that likely reduction in adherence -- two patients with the same quantity of supply will have the same percentage of adherence even if one has had substantial delays in supply at some points and the other supplied in time.
-
-To adjust for this, *CMA5* and *CMA6* provide alternative calculations to CMA1 and CMA2 respectively. 
-Thus, we instead calculate the number of gap days, extract it from the total time interval, and divide this value by the total time interval (first to last event in CMA5, and first event to end of OW in CMA6). 
-By considering the gaps, we now need to decide whether to control for how any remaining supply is used when a new supply is obtained. 
-Two additional parameters are included here: `carry.only.for.same.medication` and `consider.dosage.change`. 
-Both are set here as `FALSE`, to specify the fact that carry over should always happen irrespective of what medication is supplied, and that the duration of the remaining supply should be modified if the dosage recommendations are changed with a new medication event. 
-As shown in [Figures 6](#Figure-6) and [7](#Figure-7), these alternative calculations do not make any difference for patient `76`, because there are no gaps between the 5 events in the OW highighted. 
-There could be, however, situations in which large gaps between some events in the OW result in lower CMA estimates when considering timing of events.
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-6\"></a>**Figure 6.** Simple CMA 5", fig.height=5, fig.width=7}
-cma5 <- CMA5(data=ExamplePats, # we're estimating CMA5 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             event.daily.dose.colname="PERDAY",
-             medication.class.colname="CATEGORY",
-             carry.only.for.same.medication=FALSE, # carry-over across medication types
-             consider.dosage.change=FALSE, # don't consider canges in dosage
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-plot(cma5,patients.to.plot=c("76"), show.legend=FALSE);
-```
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-7\"></a>**Figure 7.** Simple CMA 6", fig.height=5, fig.width=7}
-cma6 <- CMA6(data=ExamplePats, # we're estimating CMA6 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             event.daily.dose.colname="PERDAY",
-             medication.class.colname="CATEGORY",
-             carry.only.for.same.medication=FALSE,
-             consider.dosage.change=FALSE,
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-plot(cma6,patients.to.plot=c("76"), show.legend=FALSE);
-```
+We will illustrate here *CMA7*, which is the most complex calculation presented by Vollmer and colleagues. The interested reader may consult the AdhereR vignette for the other CMA versions.
 
 #### CMA7
-All CMAs so far have another limitation: they do not consider the interval between the start of the OW and the first event within the OW. 
-For situations in which the OW start coincides with the treatment episode start, this limitation has no consequences. 
-But in scenarios like ours (OW starts during the episode) this has two major drowbacks. 
-First, the time interval for calculating CMA is not the same for all patients; this can result in biases, for example if the intervention group tends to refill sooner after the intervention moment than the control group, the control group might seem more adherent but it is because CMA is calculated on a shorter time interval within the following year. 
-And second, if there is any medication supply left from before the OW start, this is not considered (so CMA may be underestimated). 
 
-*CMA7* addresses this limitation by extending the nominator to the whole OW interval, and by considering carry over both from before and within the OW. 
-The same paremeters are available to specify whether this depends on the type of medication and considers dosage changes (applied now to both types of carry over). 
-[Figure 8](#Figure-8) shows how considering the period at the OW start and the prior supply reduces CMA7 to 69%, due to the gap visible in the medication history plot between the event before the OW and the first event within the OW.
+Creating an object of class `CMA7` with various parameters automatically performs the estimation of CMA7 for all the patients in the dataset; moreover, the object is smart enough to allow the appropriate printing and plotting.
+The object includes all the parameter values with which it was created, as well as the `CMA` `data.frame`, which is the main result, with two columns: patient ID and the corresponding CMA estimate. 
+The CMA estimates appear as ratios, but can be trivially transformed into percentages and rounded, as we did for patient `76` below (rounded to 2 decimals). 
+The plots show the CMA as percentage rounded to 1 decimal ( [Figure 2](#Figure-2)).
 
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-8\"></a>**Figure 8.** Simple CMA 7", fig.height=5, fig.width=7}
+```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-2\"></a>**Figure 2.** Simple CMA 7", fig.height=5, fig.width=7}
 cma7 <- CMA7(data=ExamplePats, # we're estimating CMA7 now!
              ID.colname="PATIENT_ID",
              event.date.colname="DATE",
@@ -506,56 +374,6 @@ cma7 <- CMA7(data=ExamplePats, # we're estimating CMA7 now!
              observation.window.duration=365,
              date.format="%m/%d/%Y");
 plot(cma7, patients.to.plot=c("76"), show.legend=FALSE);
-```
-
-#### CMA8
-When entering a randomized controlled trial involving a new medication, a patient on ongoing treatment may be more likely to finish the current supply before starting the trial medication. 
-In these situations, it may be more appropriate to consider a lagged start of the OW (even if this results in a different denominator for trial participants). 
-Let's consider this different scenario for patient `76`: at day 374, a new treatment (`medB`) starts and we need to estimate CMA for the next 294 days (until the next medication change). 
-But there is still some `medA` left, so it is likely that the patient finished this first. 
-[Figure 9](#Figure-9) shows how the OW is shortened with the number of days it would have taken to finish the remaining `medA` (assuming use as prescribed); *CMA8* is quite low 36.1%, given the long gaps between medB events.
-In a future version, it might be interesting to implement the possibility to also move the end of OW so that its length is preserved.
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-9\"></a>**Figure 9.** Simple CMA 8", fig.height=5, fig.width=7}
-cma8 <- CMA8(data=ExamplePats, # we're estimating CMA8 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             event.daily.dose.colname="PERDAY",
-             medication.class.colname="CATEGORY",
-             carry.only.for.same.medication=FALSE,
-             consider.dosage.change=FALSE,
-             followup.window.start=0, observation.window.start=374, 
-             observation.window.duration=294,
-             date.format="%m/%d/%Y");
-plot(cma8, patients.to.plot=c("76"), show.legend=FALSE);
-# The value for patient 76, rounded at 2 digits
-round(cma8$CMA[cma8$CMA$PATIENT_ID== 76, 2]*100, 2);
-```
-
-#### CMA9
-The previous 8 CMAs were described by [Vollmer and colleagues (2012)](#Ref-Vollmer2012) in relation to randomized controlled trials, and may apply to many observational designs as well. 
-However, they all rely on an assumption that might not hold for longitudinal cohort studies with multiple repeated measures: the medication is used as prescribed until current supply ends. 
-In CMA7, this may introduce additional variation in adherence estimates depending on where the start of the OW is located relative to the last event before the OW and the first event within the OW: an OW start closer to the first event in the OW generates lower estimates for the same number of gap days between the two events. 
-To address this, *CMA9* first computes a ratio of days’ supply for each event in the FUW (until the next event or FUW end), then weighs all days in the OW by their corresponding ratio to generate an average CMA value for the OW.
-
-For the same scenario as in CMA1 to CMA7, [Figure 10](#Figure-10) shows the estimate for CMA9, which is higher than for CMA7 (70.6% versus 69%). 
-This value would be the same no matter if the OW starts slightly earlier or later, because CMA9 considers the same intervals between events (the one starting before and the one ending after the OW). 
-Thus, it depends less on the actual date when the OW starts.
-
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-10\"></a>**Figure 10.** Simple CMA 9", fig.height=5, fig.width=7}
-cma9 <- CMA9(data=ExamplePats, # we're estimating CMA9 now!
-             ID.colname="PATIENT_ID",
-             event.date.colname="DATE",
-             event.duration.colname="DURATION",
-             event.daily.dose.colname="PERDAY",
-             medication.class.colname="CATEGORY",
-             carry.only.for.same.medication=FALSE,
-             consider.dosage.change=FALSE,
-             followup.window.start=0, observation.window.start=182, 
-             observation.window.duration=365,
-             date.format="%m/%d/%Y");
-plot(cma9, patients.to.plot=c("76"), show.legend=FALSE);
 ```
 
 
@@ -574,9 +392,9 @@ But if we consider that medication change triggers a new treatment episode, pati
 As with the simple CMAs, the `CMA_per_episode` class contains a list that includes all the parameter values, as well as a `CMA` `data.frame` (with all columns of the `compute.treatment.episodes()` output table, plus a new column with the CMA values). 
 The `CMA_per_episode` values can also be transformed into percentages and rounded, as we did for patient `76` below (rounded to 2 decimals). 
 Plots now include an extra section at the top, where each episode is shown as a horizontal bar of length equal to the episode duration, and the corresponding CMA estimates are given both as percentage (rounded to 1 decimal) and as a grey area. 
-An extra area on the right of the plot displays the distribution of all CMA values for the whole FUW as a histogram or as smoothed kernel density (see [Figure 11](#Figure-11)).
+An extra area on the right of the plot displays the distribution of all CMA values for the whole FUW as a histogram or as smoothed kernel density (see [Figure 3](#Figure-3)).
 
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-11\"></a>**Figure 11.** CMA 9 per episode", fig.height=5, fig.width=7}
+```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-3\"></a>**Figure 3.** CMA 9 per episode", fig.height=5, fig.width=7}
 cmaE <- CMA_per_episode(CMA="CMA9", # apply the simple CMA9 to each treatment episode
                         data=ExamplePats,
                         ID.colname="PATIENT_ID",
@@ -598,9 +416,7 @@ cmaE <- CMA_per_episode(CMA="CMA9", # apply the simple CMA9 to each treatment ep
                         observation.window.start.unit = "days",
                         observation.window.duration=365*2,
                         observation.window.duration.unit = "days",
-                        date.format="%m/%d/%Y",
-                        parallel.backend="snow", # parallel processing speeds things up
-                        parallel.threads=2);
+                        date.format="%m/%d/%Y");
 # Summary:
 cmaE;
 # The CMA estimates table:
@@ -619,9 +435,9 @@ When discussing the issue of granularity earlier, we mentioned that estimating a
 In such cases, we might want to compare successive intervals, for example 4-month intervals. 
 `CMA_sliding_window` allows us to compute any of the 9 simple CMAs for repeated time intervals (*sliding windows*) within an OW. 
 A similar output is produced as for `CMA_per_episode`, including a CMA table (with patient ID, window ID, window start and end dates, and the CMA estimate). 
-[Figure 12](#Figure-12) shows the results of CMA9 for patient `76`: 6 sliding windows of 4 months, among which 2 have a CMA higher than 80%, two have values around 60% and two around 40%, suggesting a variable quality of implementation. 
+[Figure 4](#Figure-4) shows the results of CMA9 for patient `76`: 6 sliding windows of 4 months, among which 2 have a CMA higher than 80%, two have values around 60% and two around 40%, suggesting a variable quality of implementation. 
 
-```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-12\"></a>**Figure 12.** Sliding window CMA 9", fig.height=5, fig.width=7}
+```{r, echo=TRUE, fig.show='hold', fig.cap = "<a name=\"Figure-4\"></a>**Figure 4.** Sliding window CMA 9", fig.height=5, fig.width=7}
 cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each sliding window
                            data=ExamplePats,
                            ID.colname="PATIENT_ID",
@@ -640,9 +456,7 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
                            sliding.window.duration.unit="days",
                            sliding.window.step.duration=120,
                            sliding.window.step.unit="days",
-                           date.format="%m/%d/%Y",
-                           parallel.backend="snow", # parallel processing speeds things up
-                           parallel.threads=2);
+                           date.format="%m/%d/%Y");
 # Summary:
 cmaW;
 # The CMA estimates table:
@@ -656,11 +470,11 @@ plot(cmaW, patients.to.plot=c("76"), show.legend=FALSE);
 
 The sliding windows can also overlap, as illustrated below. 
 This can for example be used to estimate the variation of adherence (implementation) during an episode. 
-[Figure 13](#Figure-13) shows 21 sliding windows of 4 month for patient `76`, in steps of 1 month. 
+[Figure 5](#Figure-5) shows 21 sliding windows of 4 month for patient `76`, in steps of 1 month. 
 The patient's quality of implementation oscillated between 37% and 100% during the 2 years of follow-up. 
 This output can be further analyzed in relation to patterns of health status if such data are available for the same time period. 
 
-```{r, echo=FALSE, fig.show='hold', fig.cap = "<a name=\"Figure-13\"></a>**Figure 13.** Sliding window CMA 9", fig.height=5, fig.width=7}
+```{r, echo=FALSE, fig.show='hold', fig.cap = "<a name=\"Figure-5\"></a>**Figure 5.** Sliding window CMA 9", fig.height=5, fig.width=7}
 cmaW1 <- CMA_sliding_window(CMA.to.apply="CMA9",
                            data=ExamplePats,
                            ID.colname="PATIENT_ID",
@@ -679,9 +493,7 @@ cmaW1 <- CMA_sliding_window(CMA.to.apply="CMA9",
                            sliding.window.duration.unit="days",
                            sliding.window.step.duration=30,
                            sliding.window.step.unit="days",
-                           date.format="%m/%d/%Y",
-                           parallel.backend="snow",
-                           parallel.threads=3);
+                           date.format="%m/%d/%Y");
 # Plot:
 plot(cmaW1, patients.to.plot=c("76"), show.legend=FALSE)
 ```
@@ -696,13 +508,11 @@ This function is generic and interactive, and the most important argument is the
 Currently, it uses `RStudio`'s `manipulate` library, which means that it only works within `RStudio` and the interface is heavily limited by this library's capacities. but despite these apparent constraints, it is, nevertheless, a very useful and flexible tool.
 
 After the function was called, the user can select a patient (from a drop-down list of unique patient identifiers present in the dataset), a simple CMA (1 to 9), and can also change various parameters concerning to the FUW, OW, the particular simple CMA, the treatment episodes, or the sliding windows, as appropriate. 
-The effects of these choices are visualized in real time (see [Figure 14](#Figure-14) for a screenshot), but depending on the complexity of the computation and on the hardware, this might be more or less instantaneous.
-An example is given below (please note that you must run this code within `RStudio` and manually select the various parameters as shown in the screenshot in [Figure 14](#Figure-14)):
+The effects of these choices are visualized in real time (see [Figure 6](#Figure-6) for a screenshot), but depending on the complexity of the computation and on the hardware, this might be more or less instantaneous.
+An example is given below (please note that you must run this code within `RStudio` and manually select the various parameters as shown in the screenshot in [Figure 6](#Figure-6)):
 
 ```{r, echo=TRUE, eval=FALSE}
 # Interactive plotting of CMA per-treatment-episode
-# Please run only within RStudio!
-library(AdhereR)
 plot_interactive_cma(data=med.events[med.events$PATIENT_ID %in% c(37, 76), ],
                      cma.class="per episode",
                      ID.colname="PATIENT_ID",
@@ -713,172 +523,20 @@ plot_interactive_cma(data=med.events[med.events$PATIENT_ID %in% c(37, 76), ],
                      date.format="%m/%d/%Y");
 ```
 
-![<a name="Figure-14"></a>**Figure 14.** Interactive plotting within `RStudio` (screenshot).](./interactive-plotting.jpg "Interactive plotting (screenshot)")
-
-## Technical details
-
-Here we overview some technical details, including the main `S3` classes and functions (probably useful for scripting and extension), our treatment of dates and durations, and the issue of performance and parallelism (useful for large datasets).
+![<a name="Figure-6"></a>**Figure 6.** Interactive plotting within `RStudio` (screenshot).](./AdhereR Tutorial/figures/interactive-plotting.jpg "Interactive plotting (screenshot)")
 
 
-### Main `S3` classes and functions
 
-The `S3` class `CMA0` is the most basic object, basically encapsulating the dataset and desired parameter values; it should not be normally used directly (except for plotting the event data as such), but it is the foundation for the other classes.
-A `CMA0` (and derived) object can print itself (the output is optimized either for text, LaTeX or Markdown), can plot itself (with various parameters controlling exactly how), and offers the accessor function `getCMA()` for easy access to the CMA estimate.
-Please note that these CMAs all work for datasets that contain more than one patient, and the estimates are computed for each patient independently, and the plotting can display more than one patient (in this case the patients are plotted on top of each other vertically), as shown in [Figure 1](#Figure-1).
-
-The simple CMAs are implemented by the `S3` classes `CMA1` -- `CMA9`, that are derived from `CMA0` and reload its methods.
-Thus, one can easily implement a new simple CMA by extending the base `CMA0` class.
-
-The iterative CMAs, in contrast, are not derived from `CMA0` but use internally such a simple CMA to perform their computations.
-For the moment, they can *not* be extended to new simple CMAs derived from `CMA0`, but, if needed, such a mechanism could be implemented.
-
-The most important functions are:
-
-- `compute.event.int.gaps()`: for a given event database, this computes the gap days and event intervals in various scenarious, and while it should not in general be directly used, it is exported in case a use scenario requires this explicit computation;
-- `compute.treatment.episodes()`: this computes the treatment episodes for each patient in various scenarios;
-- `getCMA()`: getter functions, giving access to the estimated CMAs;
-- `plot_interactive_cma()`: plots interactively within RStudio (see the [Interactive plotting section](#Section-interactive-plotting)).
-
-
-### Calendar dates and durations
-
-A potentially confusing (but very powerful and flexible) aspect of our implementation concerns our treatment of dates and durations.
-
-First, the *duration of an event* is given in a *column* in the dataset containing, for each event, its duration (as a positive integer) in *days*.
-However, *other durations* (such as for FUW or the sliding windows) are given as positive integers representing the number of *units*; these units can be "days" (the default), "weeks", "months", or "years".
-
-The *date of an event* is given in a *column* in the dataset containing, for each event, its start date as a string (`character`) in the format given by the `date.format` parameter (by default, mm/dd/yyyy).
-The *start* of the FUW, OW and sliding windows can be given either as the number (integer) of *units* ("days", "weeks", "months", or "years") since the first recorded event for the patient, or as an object of *class `Date`* representing the actual calendar start date, or a string (`character`) giving a *column name* in the dataset containing, per patient, either the calendar start date as `Date` object (i.e., this column must be of type `Date`) or as the number of units if the column has type `numeric`.
-While this might be confusing, it allows greater flexibility in specifying the start dates; the most important pitfall is in passing a date as a string (type `character`) which will result in an error as there is no such column in the dataset -- make sure it is converted to a `Date` object by using, for example, `as.Date()`!
-However, for most scenarios, the default of giving the number of units since the earliest event is more than enough and is the recommended (and most carefully tested) way.
-
-
-### Performance, parallelism and implementation
-
-While currently implemented in pure `R`, we have extensively profiled and optimized our code to allow the processing of large databases even on consumer-grade hardware.
-For example, [Table 4](#Table-4) below gives the running times (single-threaded and two parallel multicore threads -- see below for details) for a database of 13,922 unique patients and 112,984 prescriptions of all CMAs described here, on an Apple MacBook Air 11" (7,1; early 2015) with 8Go RAM (DDR3 @ 1600MHz) and a Core i7-5650U CPU (2 cores, 4 threads with hyperthreading @ 2.20GHz, Turbo Boost to 3.10GHz), using MacOS X "El Capitan" (10.11.6), `R` 3.3.1 (64 bits) and `RStudio` 1.0.44.
-[Table 5](#Table-5) below shows the running times (single-threaded and four parallel multicore threads) for a very large database of 500,000 unique patients and 4,058,110 prescriptions (generated by repeatedly concatenating the database described above and uniquely renaming the participants) of all CMAs described here, on a desktop computer with 16Go RAM and a Core i7-3770 CPU (4 cores, 8 threads with hyperthreading @ 3.40GHz, Turbo Boost to 3.90GHz), using OpenSuse 13.2 (Linux kernel 3.16.7) and `R` 3.3.2 (64 bits).
-[Table 6](#Table-6) shows the same information as [Table 5](#Table-5), but on a high-end desktop computer with 32Go RAM and a Core i7-4790K CPU (4 cores, 8 threads with hyperthreading @ 4.00GHz, Turbo Boost to 4.40GHz), running Windows 10 Professional 64 bits (version 1607) and `R` 3.2.4 (64 bits); as dicusssed below, the "multicore" backend is currently not available on Windows.
-
-As these benchmarking results show, a database close to the median sample sizes in the literature (median 10,265 patients versus our 13,922 patients; [Sattler *et al.*, 2011](#Ref-Sattler2011)) can be processed almost in real-time on a consumer laptop, while very large databases (half a million patients) require tens of minutes to a few hours on a mid-to-high end desktop computers, especially when making use of parallel processing.
-Interestingly, Linux seems to have a small but measurable performance advantage over Windows (despite the slightly lower-end hardware) and the "multicore" backend becomes preferable to the "snow" backend for very large databases (probably due to the data transmission and collection overheads), but not by a very large margin.
-Therefore, for very large databases, we recommend Linux on a multi-core/multi-CPU mechine with enough RAM and the "multicore" backend.
-
-
-| CMA             | Single-threaded | Two threads (multicore) | Two threads (snow) |
-|-----------------|----------------:|------------------------:|-------------------:|
-| CMA 1           |      40.8 (0.7) |              20.8 (0.4) |         22.0 (0.4) |
-| CMA 2           |      41.2 (0.7) |              21.7 (0.4) |         24.4 (0.4) |
-| CMA 3           |      39.3 (0.7) |              20.4 (0.3) |         22.9 (0.4) |
-| CMA 4           |      40.2 (0.7) |              21.3 (0.4) |         23.0 (0.4) |
-| CMA 5           |      56.6 (0.9) |              29.7 (0.5) |         31.5 (0.5) |
-| CMA 6           |      58.0 (1.0) |              30.9 (0.5) |         32.5 (0.5) |
-| CMA 7           |      55.5 (0.9) |              28.9 (0.5) |         30.6 (0.5) |
-| CMA 8           |     131.8 (2.2) |              72.5 (1.2) |         71.6 (1.2) |
-| CMA 9           |     159.4 (2.7) |              85.2 (1.4) |         86.5 (1.4) |
-| per episode     |     263.9 (4.4) |             139.0 (2.3) |        139.7 (2.3) |
-| sliding window  |    643.6 (10.7) |             347.9 (5.8) |        339.5 (5.7) |
-
-Table: <a name="Table-4"></a>**Table 4.** Performance as running times (single- and two-threaded, multicore and snow respectively) when computing CMAs for a large database with 13,922 patients with 112,983 events on a consumer-grade MacBook Air laptop running MacOSX El Capitan. The times shown are "real" (i.e., clock) running times in seconds (as reported by `R`’s `system.time()` function) and minutes. In all cases, the FUW and OW are identical at 2 years long. CMAs per episode (with gap=180 days) and sliding window (length=180 days, step=90 days) used CMA1 for each episode/window. Please note that the multicore and snow times are slightly longer than half the single-core times due to various data transmission and collection overheads. 
-
-
-| CMA             |                Single-threaded |      Four threads (multicore) |           Four threads (snow) |
-|-----------------|-------------------------------:|------------------------------:|------------------------------:|
-| CMA 1           |                  1839.7 (30.6) |                  577.0  (9.6) |                  755.5 (12.6) |
-| CMA 2           |                  1779.0 (29.7) |                  490.1  (8.2) |                  915.7 (15.3) |
-| CMA 3           |                  1680.6 (28.0) |                  458.5  (7.6) |                  608.3 (10.1) |
-| CMA 4           |                  1778.9 (30.0) |                  489.0  (8.2) |                  644.5 (10.7) |
-| CMA 5           |                  2500.7 (41.7) |                  683.3 (11.4) |                  866.2 (14.4) |
-| CMA 6           |                  2599.8 (43.3) |                  714.5 (11.9) |                 1123.8 (18.7) |
-| CMA 7           |                  2481.2 (41.4) |                  679.4 (11.3) |                  988.1 (16.5) |
-| CMA 8           |     5998.0 (100.0 = 1.7 hours) |                 1558.1 (26.0) |                 2019.6 (33.7) |
-| CMA 9           |     7039.7 (117.3 = 1.9 hours) |                 1894.7 (31.6) |                 3002.7 (50.0) |
-| per episode     |    11548.5 (192.5 = 3.2 hours) |                 3030.5 (50.5) |                 3994.2 (66.6) |
-| sliding window  |    27651.3 (460.8 = 7.7 hours) |    7198.3 (120.0 = 2.0 hours) |   12288.8 (204.8 = 3.4 hours) |
-
-Table: <a name="Table-5"></a>**Table 5.** Performance as running times (single- and two-threaded, multicore and snow respectively) when computing CMAs for a very large large database with 500,000 patients with 4,058,110 events on a mid/high-range consumer desktop running OpenSuse 13.2 Linux. The times shown are "real" (i.e., clock) running times in seconds (as reported by `R`’s `system.time()` function), minutes and, if large enough, hours. In all cases, the FUW and OW are identical at 2 years long. CMAs per episode (with gap=180 days) and sliding window (length=180 days, step=90 days) used CMA1 for each episode/window. Please note that the multicore and especially the snow times are slightly longer than a quarter the single-core times due to various data transmission and collection overheads. 
-
-
-| CMA             |                Single-threaded |           Four threads (snow) |
-|-----------------|-------------------------------:|------------------------------:|
-| CMA 1           |                  2070.9 (34.5) |                  653.1 (10.9) |
-| CMA 2           |                  2098.9 (35.0) |                  667.5 (13.4) |
-| CMA 3           |                  2013.8 (33.6) |                  661.5 (22.0) |
-| CMA 4           |                  2094.4 (34.9) |                  685.2 (11.4) |
-| CMA 5           |                  2823.4 (47.1) |                  881.0 (14.7) |
-| CMA 6           |                  2909.0 (48.5) |                  910.3 (15.2) |
-| CMA 7           |                  2489.1 (41.5) |                  772.6 (12.9) |
-| CMA 8           |     5982.5  (99.7 = 1.7 hours) |                 1810.1 (30.2) |
-| CMA 9           |     6030.2 (100.5 = 1.7 hours) |                 2142.1 (35.7) |
-| per episode     |    10717.1 (178.6 = 3.0 hours) |                 3877.2 (64.6) |
-| sliding window  |    25769.5 (429.5 = 7.2 hours) |    9353.6 (155.9 = 2.6 hours) |
-
-Table: <a name="Table-6"></a>**Table 6.** Performance as running times (single- and two-threaded, multicore and snow respectively) when computing CMAs for a very large large database with 500,000 patients with 4,058,110 events on a high-end desktop computer running Windows 10. The times shown are "real" (i.e., clock) running times in seconds (as reported by `R`’s `system.time()` function), minutes and, if large enough, hours. In all cases, the FUW and OW are identical at 2 years long. CMAs per episode (with gap=180 days) and sliding window (length=180 days, step=90 days) used CMA1 for each episode/window. Please note that the snow times are longer than a quarter the single-core times due to various data transmission and collection overheads. 
-
-Concerning *parallelism*, if run on a multi-core/multi-processor machine or cluster, `AdhereR` gives the user the possibility to use (completely transparently) two parallel backends: *multicore* (available on Linux, \*BSD and MacOS, but currently not on Microsoft Windows) and *snow* (Simple Network of Workstations, available on all platforms; in fact, this can use various types of backends, see the documentation in package `snow` for details).
-Parallelism is available through the `parallel.backend` and `parallel.threads` parameters, where the first controlls the actual backend to use ("none" -- the default, uses a single thread --, "multicore", and several versions of snow: "snow", "snow(SOCK)", "snow(MPI)", "snow(NWS)") and the second the number of desired parallel threads ("auto" defaults to the reported number of cores for "multicore" or 2 otherwise, and to 2 for "snow") or a more complex specification of the nodes for "snow" (see the `snow` package documentation for details).
-The implementation uses `mclapply` (in package `parallel`) and `parLapply` (package `snow`), is completely hidden from the user, and tries to pre-allocate whole chunks of patients to the CPUs/cores in order to reduce the various overheads (such as data transfer).
-In general, for "multicore" and "snow" with nodes on the local machine, do not use more than the number of physical cores in the system, and be mindful of the various overheads involved, meaning that the gains, while substantial especially for large databases, will be very slightly lower than the expected 1/#threads (as a corrolary, it might not be a good idea to paralellize very small datasets).
-Also, memory might be of concern when parallelizing, as at least parts of `R`'s environment will be replicated across threads/processes; this, in turn, for large environments and systems low on RAM, might result in massive performance loss due to swapping (or even result in crashes).
-For more information on parallelism in `R` please see, for example, [CRAN Task View: High-Performance and Parallel Computing with R](https://CRAN.R-project.org/view=HighPerformanceComputing) and the various blogposts and books on the matter.
-
-Conceptually, we exploited various optimization techniques (see, for example, Hadley Wickham's [Advanced R](http://adv-r.had.co.nz/) and other blogposts on profiling and optimizing `R` code), but the two most important architectural decisions are to (a) extensively use [`data.table`](http://r-datatable.com/) and (b) to pre-allocate chunks of participants for parallel processing.
-The general framework is to define a "workhorse" function that can process a set of participants and returns one `data.frame` or `data.table` (or several, in which case they must be encapsulated in a `list()`), workhorse function that is transparently called for the whole dataset (if `parallel.backend` is "none"), or in parallel for subsets of the whole dataset of roughly 1/`parallel.threads` size (for "multicore" and "snow"), in the latter case the results being transparently recombined (even if multiple results are returned in a `list()`).
-Internally, the workhorse functions tend to make extensive use of the `data.table` "reference semantics" (the `:=` operator) to perform in-place changes and avoid unnecessary copying of objects, `key`s for fast indexing, search and selection, and the `by` grouping mechanism, allowing the application of a specialized function to each individual patient (or episode or sliding window, as needed).
-We decided to keep everything "pure `R`" (so there is so far no `C++` code) and the code is extensively commented and hopefully clear to understand, change and extend.
-
-
-## Conclusions
-
-'AdhereR' was developed to facilitate flexible and comprehensive analyses of adherence to medication from electronic healthcare data. All objects included in this package ('compute.treatment.episodes', 'CMA1' to 'CMA9', and their 'CMA_per_episode' and CMA_sliding_window versions) can be adapted to various research questions and designs, and we provided here only a few examples of the vast range of possibilities for use. Depending on the type of medication, study population, length of follow-up, etc., the various alternative parametrizations may lead to substantial differences or negligible variation. Very little evidence is available on the impact of these choices in specific scenarios. This package makes it easy to integrate such methodological investigations into data analysis plans, and to communicate these to the scientific community.
-
-We have also aimed to facilitate replicability. Thus, summaries of functions include all parameter values and are easily printed for transparent reporting (for example in an appendix or a supplementary online material). The calculation of adherence values via 'AdhereR' can also be integrated in larger data analysis scripts and made available in a data repository for future use in similar studies, freely-available or with specific access rights. This allows other research teams to use the same parametrizations (for example if studying the same type of medication in different populations), and thus increase homogeneity of studies for the benefit of later meta-analytic efforts. If these parametrizations are complemented by justifications of each decision based on clinical and/or research evidence in specific clinical areas, they can be subject to discussion and clinical consensus building and thus represent transparent and easily-implementable guidelines for EHD-based adherence research in those areas. In this situation, comparisons across medications can also take into account any differences in analysis choices, and general rules derived for adherence calculation across domains. 
 
 
 ## References
 
 <a name="Ref-Arnet2016"></a>Arnet I., Kooij M.J., Messerli M., Hersberger K.E., Heerdink E.R., Bouvy M. (2016) [Proposal of Standardization to Assess Adherence With Medication Records Methodology Matters](https://www.ncbi.nlm.nih.gov/pubmed/26917817). *The Annals of Pharmacotherapy* **50**(5):360–8. [doi:10.1177/1060028016634106](http://dx.doi.org/10.1177/1060028016634106).
 
-<a name="Ref-Gardarsdottir2010"></a>Gardarsdottir H., Souverein P.C., Egberts T.C.G., Heerdink E.R. (2010) [Construction of drug treatment episodes from drug-dispensing histories is influenced by the gap length](https://www.ncbi.nlm.nih.gov/pubmed/19880282). *J Clin Epidemiol.* **63**(4):422–7. [doi:10.1016/j.jclinepi.2009.07.001](http://dx.doi.org/10.1016/j.jclinepi.2009.07.001).
-
-<a name="Ref-Greevy2011"></a>Greevy R.A., Huizinga M.M., Roumie C.L., Grijalva C.G., Murff H., Liu X., Griffin, M.R. (2011). [Comparisons of Persistence and Durability Among Three Oral Antidiabetic Therapies Using Electronic Prescription-Fill Data: The Impact of Adherence Requirements and Stockpiling](https://www.ncbi.nlm.nih.gov/pubmed/22048232). *Clinical Pharmacology & Therapeutics* **90**(6):813–819. [doi:10.1038/clpt.2011.228](http://dx.doi.org/10.1038/clpt.2011.228).
-
 <a name="Ref-Peterson2007"></a>Peterson A.M., Nau D.P., Cramer J.A., Benner J., Gwadry-Sridhar F., Nichol M. (2007) [A checklist for medication compliance and persistence studies using retrospective databases](https://www.ncbi.nlm.nih.gov/pubmed/17261111). *Value in Health: Journal of the International Society for Pharmacoeconomics and Outcomes Research* **10**(1):3–12. [doi:10.1111/j.1524-4733.2006.00139.x](http://dx.doi.org/10.1111/j.1524-4733.2006.00139.x).
-
-<a name="Ref-SouvereinInPress"></a>Souverein PC, Koster ES, Colice G, van Ganse E, Chisholm A, Price D, et al. (*in press*) [Inhaled Corticosteroid Adherence Patterns in a Longitudinal Asthma Cohort.](http://www.sciencedirect.com/science/article/pii/S2213219816304238) *J Allergy Clin Immunol Pract*. [doi:10.1016/j.jaip.2016.09.022](http://dx.doi.org/10.1016/j.jaip.2016.09.022).
 
 <a name="Ref-Vollmer2012"></a>Vollmer W.M., Xu M., Feldstein A., Smith D., Waterbury A., Rand C. (2012) [Comparison of pharmacy-based measures of medication adherence](https://www.ncbi.nlm.nih.gov/pubmed/22691240). *BMC Health Services Research* **12**(1):155. [doi:10.1186/1472-6963-12-155](http://dx.doi.org/10.1186/1472-6963-12-155).
 
-<a name="Ref-Vrijens2012"></a>Vrijens B., De Geest S., Hughes D.A., Przemyslaw K., Demonceau J., Ruppar T., Dobbels F., Fargher E., Morrison V., Lewek P., Matyjaszczyk M., Mshelia C., Clyne W., Aronson J.K., Urquhart J.; ABC Project Team (2012) [A new taxonomy for describing and defining adherence to medications](https://www.ncbi.nlm.nih.gov/pubmed/22486599). *British Journal of Clinical Pharmacology* **73**(5):691–705. [doi:10.1111/j.1365-2125.2012.04167.x](http://dx.doi.org/10.1111/j.1365-2125.2012.04167.x).
-
-<a name="Ref-VanWijk2006"></a>Van Wijk B.L.G., Klungel O.H., Heerdink E.R., de Boer A. (2006). [Refill persistence with chronic medication assessed from a pharmacy database was influenced by method of calculation](https://www.ncbi.nlm.nih.gov/pubmed/16360556). *Journal of Clinical Epidemiology* **59**(1), 11–17. [doi:10.1016/j.jclinepi.2005.05.005](http://dx.doi.org/10.1016/j.jclinepi.2005.05.005).
-
-<a name="Ref-Sattler2013"></a>Sattler E., Lee J., Perri M. (2011). [Medication (Re)fill Adherence Measures Derived from Pharmacy Claims Data in Older Americans: A Review of the Literature](https://www.ncbi.nlm.nih.gov/pubmed/23553512). *Drugs  & Aging* **30**(6), 383–99. [doi:10.1007/s40266-013-0074-z](http://dx.doi.org/10.1007/s40266-013-0074-z).
 
 
-<!-- Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format: -->
 
-<!-- - Never uses retina figures -->
-<!-- - Has a smaller default figure size -->
-<!-- - Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style -->
-
-<!-- ## Vignette Info -->
-
-<!-- Note the various macros within the `vignette` section of the metadata block above. These are required in order to instruct R how to build the vignette. Note that you should change the `title` field and the `\VignetteIndexEntry` to match the title of your vignette. -->
-
-<!-- ## Styles -->
-
-<!-- The `html_vignette` template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows: -->
-
-<!--     output:  -->
-<!--       rmarkdown::html_vignette: -->
-<!--         css: mystyles.css -->
-
-
-<!-- ## More Examples -->
-
-<!-- You can write math expressions, e.g. $Y = X\beta + \epsilon$, footnotes^[A footnote here.] -->
-<!-- Also a quote using `>`: -->
-
-<!-- > "He who gives up [code] safety for [code] speed deserves neither." -->
-<!-- ([via](https://twitter.com/hadleywickham/status/504368538874703872)) -->

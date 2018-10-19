@@ -1,7 +1,7 @@
 ---
 title: "AdhereR: Estimate Adherence from Electronic Healthcare Data"
 author: "Samuel S. Allemann, Alexandra L. Dima"
-date: "28 November 2018"
+date: "29 November 2018"
 output:
   ioslides_presentation:
     incremental: true
@@ -13,15 +13,46 @@ knitr::opts_chunk$set(echo = FALSE)
 library(shinyWidgets)
 ```
 
-## Background
+## So far...
 
-- Adherence estimations based on *Electronic healthcare data* (EHD) are central to research and clinical practice across clinical conditions
+Electronic monitoring data (EM):
+
+- max zoom: each administration is recorded
+- analysis: 
+    - adherence characterises an individual over a time period: 
+        - 3M, 1M, 1W, between visits; 
+        - skipped doses, missed days, drug holidays; (time to) discontinuation
+    - adherence characterises a cohort/sample at a time t: 
+        - per day
+        - % individuals taking >= prescribed; survival curve
+
+## ... something completely different?
+
+Electronic healthcare data (EHD): 
+
+- zoom out: only prescription AND/OR dispensing data
+- analysis: 
+    - adherence characterizes an individual during a time period
+        - interval duration varies, commonly 6M - 2Y
+        - % medication availability (MPR, PDC, CMA), n refills; (time to) refill gap
+    - adherence characterises a cohort/sample at a time t:
+        - interval duration varies
+        - % individuals x% availability; % individuals persistent at time t
+
+## Why EHD?
+
+- data available from routine care for large samples with minimal extra costs
     + Estimate prevalence of (non-)adherence
     + Identify predictors of (non-)adherence
     + Model impact of adherence on clinical outcomes
     + Identify individuals with suboptimal adherence for targeted interventions
+    
+- limitations: 
+    + low granularity 
+    + variable data entry quality & standards 
+    + limited info recorded
 
-## Electronic Healthcare Data
+## What EHD?
 
 - Administrative Data
     + Prescription databases
@@ -35,11 +66,14 @@ library(shinyWidgets)
     
 ## Methodology matters
 
-- Different adherence estimates from same data
+- Different adherence estimates from the same data
 - Insufficiently reported algorithms
 - Lack of standardization and transparency
 - Misinformed clinical decisions
-- ((Example?))
+
+example: 
+method-related variation in adherence to sibutramine 63 - 109.7%
+(Hess et al., 2006)
 
 ## AdhereR
 
@@ -69,7 +103,7 @@ library(shinyWidgets)
 ## Definitions: Adherence taxonomy
 
 - *Adherence* = the extent to which a patient's medication use corresponds to prescribed use, expressed as continuous multiple-interval measures of medication availability (CMA)
-- *Initiation* = the length of time between the first brescribing event and the first dispensing event
+- *Initiation* = the length of time between the first prescribing event and the first dispensing event
 - *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
 - *Implementation* = Adherence during periods of persistence
 
@@ -77,12 +111,11 @@ library(shinyWidgets)
 
 ## Definitions: Time frames
 
-<!-- > - *Follow-up window* (FUW)  -->
-<!-- > - *Observation window* (OW)  -->
-<!-- > - *Treatment episode* (TE)  -->
-<!-- > - *Permissible gap*  -->
+> - *Follow-up window* (FUW)
+> - *Observation window* (OW)
+> - *Treatment episode* (TE)
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, fig.height=4}
 library(AdhereR)
 library(data.table)
 
@@ -145,27 +178,26 @@ plot(cma7,
 3. Adherence calculation
 4. Reporting
 
-## Data preparation
+## 1. Data preparation
 
 > see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. „Using primary care electronic health record data for comparative effectiveness research: experience of data quality assessment and preprocessing in The Netherlands“. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345–54. https://doi.org/10.2217/cer-2015-0022.
-
 
 - selecting medication events applicable to the research question 
 - coding medication type depending on clinical considerations
 - calculate medication event durations (if necessary)
-- checking plausible values and correcting any deviations
-- handling missing data
+- check plausible values and correcting any deviations
+- handle missing data
 
 ## Link multiple data sources
 
 - Necessary data recorded in different databases
 - Prescription changes or hospitalizations affect adherence estimation
 - New AdhereR function to:
-    1. automatically select the last prescibed dose to calculate supply duration,
+    1. automatically select the last prescribed dose to calculate supply duration,
     2. check for prescription changes and hospitalizations during this period, and
     3. adjust the supply duration based on prescription changes and hospitalizations
 
-## Data exploration/Visualization {.build}
+## 2. Data exploration/Visualization {.build}
 
 > - Exploration during preparation stage
 > - Illustration for scientific communication
@@ -188,8 +220,8 @@ cma0 <- CMA0(data=example_data, # use the two selected patients
 
 # Plot the object (CMA0 shows the actual event data only):
 plot(cma0, # the object to plot
-     align.all.patients=TRUE, # align all patients for easier comparison
-     col.cats = c("red", "blue")) # make colors a bit nicer
+     align.all.patients=TRUE) # align all patients for easier comparison
+
 ```
 
 ## Interactive Plotting
@@ -984,25 +1016,30 @@ server <- function(input, output, session) {
   )
 ```
 
-## Adherence estimation
+## 3. Adherence calculation
 
 * `AdhereR` estimates adherence as *Continuous Medication Availability* (CMA)
 * *simple* CMA measures: `CMA1` - `CMA9`
-    + Delimination of OW,
+    + Delimitation of OW,
     + Capping of CMA values,
     + Carry-over of medication oversupply within the OW, and 
     + Carry-over of medication supply into OW.
 * *iterated* CMA measures: `CMA_per_episode` and `CMA_sliding_window`
 
-## Overall adherence
+## Overall adherence - implementation & persistence
 
-- No difference between implementation and persistence
-- ...
+- CMA itself makes no difference between implementation and persistence
+- CMA = implementation only if sample/individual is on treatment
+    - *simple* CMA for sample that initiated and did not discontinue OR
+    - *per episode* CMA identifies first treatment episodes then computes CMA for each
 
 ## Initiation
 
 - Requires prescription and dispensing data - `medication_match()` function
-- ...
+
+- yes/no - availability of a dispensing date (within a period of time after prescription)
+- time to dispensing - `difftime(dispensing date, prescribing date, units="days")` 
+
 
 ## Persistence
 
@@ -1012,7 +1049,9 @@ server <- function(input, output, session) {
 plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
 ```
 
-## Persistence -- treatment episodes
+## Persistence 
+
+> - treatment episodes depend on max permissible gap
 
 ```{r, echo = FALSE}
 example_data$rownr <- 1:nrow(example_data)
@@ -1060,17 +1099,145 @@ renderPlot({
   })
 ```
 
+## Persistence output
+
+```{r, echo=FALSE, results='asis', }
+# Compute the treatment episodes for the two patients:
+ExamplePats <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
+
+TEs3<- compute.treatment.episodes(ExamplePats,
+                                  ID.colname="PATIENT_ID",
+                                  event.date.colname="DATE",
+                                  event.duration.colname="DURATION",
+                                  event.daily.dose.colname="PERDAY",
+                                  medication.class.colname="CATEGORY",
+                                  carryover.within.obs.window = TRUE, # carry-over into the OW
+                                  carry.only.for.same.medication = TRUE, # & only for same type
+                                  consider.dosage.change = TRUE, # dosage change starts new episode...
+                                  medication.change.means.new.treatment.episode = TRUE, # & type change
+                                  maximum.permissible.gap = 180, # & a gap longer than 180 days
+                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  followup.window.start = 0, # 2-years FUW starts at earliest event
+                                  followup.window.start.unit = "days",
+                                  followup.window.duration = 365 * 2,
+                                  followup.window.duration.unit = "days",
+                                  date.format = "%m/%d/%Y");
+knitr::kable(
+  TEs3, table.attr = "style='width:30%;'", 
+             caption = "<a name=\"Table-2\"></a>**Table 2.** Example output `compute.treatment.episodes()` function");
+```
+
 ## Implementation
 
-- CMA per episode
-- ...
+> - CMA per episode
 
-## Longitudinal analysis
+```{r, echo = FALSE}
 
-- slinding windows...
+example_data$rownr <- 1:nrow(example_data)
+dropdownButton(
+ 
+  checkboxInput(inputId = "carry_within1", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same1", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = TRUE),
+  checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = TRUE),
+    sliderInput("max_gap1", label = "Maximum permissible gap:",
+              min = 30, max = 360, value = 90, step = 5),
+
+  icon = icon("gear"),
+  width = "300px"
+  )
+
+renderPlot({
+
+   cmaE <- CMA_per_episode(CMA="CMA9", # apply the simple CMA9 to each treatment episode
+                        data=example_data,
+                        ID.colname="PATIENT_ID",
+                        event.date.colname="DATE",
+                        event.duration.colname="DURATION",
+                        event.daily.dose.colname="PERDAY",
+                        medication.class.colname="CATEGORY",
+                        carryover.within.obs.window = input$carry_within1,
+                        carry.only.for.same.medication = input$carry_same1,
+                        consider.dosage.change = input$dose_change1, # conditions on treatment episodes
+                        medication.change.means.new.treatment.episode = input$new_episode1,
+                        maximum.permissible.gap = as.numeric(input$max_gap1),
+                        maximum.permissible.gap.unit = "days",
+                        followup.window.start=0,
+                        followup.window.start.unit = "days",
+                        followup.window.duration = 365 * 2,
+                        followup.window.duration.unit = "days",
+                        observation.window.start=0,
+                        observation.window.start.unit = "days",
+                        observation.window.duration=365*2,
+                        observation.window.duration.unit = "days",
+                        date.format="%m/%d/%Y");
+
+  
+  plot(cmaE, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
+  
+  })
+```
+
+## Longitudinal analysis 
+
+> - sliding windows - vary OW duration & lag
+
+```{r, echo = FALSE}
+
+example_data$rownr <- 1:nrow(example_data)
+dropdownButton(
+ 
+  checkboxInput(inputId = "carry_within2", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same2", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change2", label = "Consider dosage change", value = TRUE),
+sliderInput("SW_dur", label = "Sliding window duration:",
+              min = 1, max = 360, value = 90, step = 5),
+sliderInput("SW_step", label = "Sliding window step:",
+              min = 1, max = 360, value = 90, step = 5),
+  icon = icon("gear"),
+  width = "300px"
+  )
+
+renderPlot({
+
+cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each sliding window
+                           data=example_data,
+                           ID.colname="PATIENT_ID",
+                           event.date.colname="DATE",
+                           event.duration.colname="DURATION",
+                           event.daily.dose.colname="PERDAY",
+                           medication.class.colname="CATEGORY",
+                           carryover.within.obs.window = input$carry_within2,
+                        carry.only.for.same.medication = input$carry_same2,
+                        consider.dosage.change = input$dose_change2, 
+                           followup.window.start=0,
+                           observation.window.start=0,
+                           observation.window.duration=365*2,
+                           sliding.window.start=0, # sliding windows definition
+                           sliding.window.start.unit="days",
+                           sliding.window.duration=as.numeric(input$SW_dur),
+                           sliding.window.duration.unit="days",
+                           sliding.window.step.duration=as.numeric(input$SW_step),
+                           sliding.window.step.unit="days",
+                           date.format="%m/%d/%Y");
+  
+  plot(cmaW, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
+  
+  })
+```
+
+## 4. Reporting
+
+- describe data preparation choices
+- justify choice of functions 
+- report any sensitivity analyses
+- share the analysis code (and data, if permitted)
 
 ## Take home messages
 
 - ...
 
 
+## Practical session(s)
+
+- ...
