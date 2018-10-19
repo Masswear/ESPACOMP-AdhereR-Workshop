@@ -180,8 +180,10 @@ plot(cma7,
 
 ## 1. Data preparation
 
-- select medication events applicable to the research question 
-- code medication type depending on clinical considerations
+> see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. „Using primary care electronic health record data for comparative effectiveness research: experience of data quality assessment and preprocessing in The Netherlands“. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345–54. https://doi.org/10.2217/cer-2015-0022.
+
+- selecting medication events applicable to the research question 
+- coding medication type depending on clinical considerations
 - calculate medication event durations (if necessary)
 - check plausible values and correcting any deviations
 - handle missing data
