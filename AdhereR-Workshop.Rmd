@@ -255,7 +255,7 @@ The rest of the parameters specify the name of the dataset (here `ExamplePats`),
 # Compute the treatment episodes for the two patients:
 ExamplePats <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
 
-TEs3<- compute.treatment.episodes(ExamplePats,
+TEs<- compute.treatment.episodes(ExamplePats,
                                   ID.colname="PATIENT_ID",
                                   event.date.colname="DATE",
                                   event.duration.colname="DURATION",
@@ -272,7 +272,7 @@ TEs3<- compute.treatment.episodes(ExamplePats,
                                   followup.window.duration = 365 * 2,
                                   followup.window.duration.unit = "days",
                                   date.format = "%m/%d/%Y");
-knitr::kable(TEs3, 
+knitr::kable(TEs, 
              caption = "<a name=\"Table-2\"></a>**Table 2.** Example output `compute.treatment.episodes()` function");
 ```
 
@@ -375,7 +375,6 @@ cma7 <- CMA7(data=ExamplePats, # we're estimating CMA7 now!
              date.format="%m/%d/%Y");
 plot(cma7, patients.to.plot=c("76"), show.legend=FALSE);
 ```
-
 
 ### The iterated CMAs
 
