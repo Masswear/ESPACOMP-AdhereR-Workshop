@@ -52,12 +52,8 @@ Electronic healthcare data (EHD):
     + variable data entry quality & standards 
     + limited info recorded
 
-## What EHD?
+## Typically available information
 
-- Administrative Data
-    + Prescription databases
-    + Pharmacy databases
-    + Insurance claims
 - Typically available information
     + Patient identifier
     + Date of event
@@ -71,9 +67,12 @@ Electronic healthcare data (EHD):
 - Lack of standardization and transparency
 - Misinformed clinical decisions
 
-example: 
-method-related variation in adherence to sibutramine 63 - 109.7%
-(Hess et al., 2006)
+## Example: Method-related variation in adherence to sibutramine
+
+<img src="figures/hess_example.JPG" style="width: 100%"/>
+
+LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
+
 
 ## AdhereR
 
@@ -107,7 +106,12 @@ method-related variation in adherence to sibutramine 63 - 109.7%
 - *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
 - *Implementation* = Adherence during periods of persistence
 
-![ABC taxonomy figure adapted for EHD](figures/ABC_taxonomy_EHD.jpg)
+## ABC Taxonomy for EHD
+
+<figure>
+<img src="figures/ABC-taxonomy-EHD.JPG" style="width: 100%"/>
+<figcaption>ABC taxonomy figure adapted for EHD</fugcaption>
+</figure>
 
 ## Definitions: Time frames
 
@@ -133,7 +137,7 @@ TEs <- compute.treatment.episodes(example_data,
                                   carry.only.for.same.medication = TRUE, # & only for same type
                                   consider.dosage.change = TRUE, # dosage change starts new episode...
                                   medication.change.means.new.treatment.episode = TRUE, # & type change
-                                  maximum.permissible.gap = 50, # & a gap longer than 180 days
+                                  maximum.permissible.gap = 90, # & a gap longer than 180 days
                                   maximum.permissible.gap.unit = "days", # unit for the above (days)
                                   followup.window.start = 0, # 2-years FUW starts at earliest event
                                   followup.window.start.unit = "days",
@@ -165,11 +169,11 @@ plot(cma7,
 #   top = tail(example_data[example_data$PATIENT_ID == id,"rownr"],1)
 #   start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
 #   end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
-#   
+# 
 #   rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)
+# }
 
 ```
-
 
 ## Working with AdhereR
 
@@ -180,13 +184,25 @@ plot(cma7,
 
 ## 1. Data preparation
 
-> see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. „Using primary care electronic health record data for comparative effectiveness research: experience of data quality assessment and preprocessing in The Netherlands“. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345–54. https://doi.org/10.2217/cer-2015-0022.
-
 - selecting medication events applicable to the research question 
 - coding medication type depending on clinical considerations
 - calculate medication event durations (if necessary)
 - check plausible values and correcting any deviations
 - handle missing data
+
+> see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345-54. https://doi.org/10.2217/cer-2015-0022.
+
+## Select medication events
+
+```{r echo = TRUE}
+load("data/example_presc_events.RData")
+disp_events <- fread("data/example_disp_events.csv")
+
+str(presc_events)
+
+presc_events_A09 <- presc_events[grepl("^A09",ATC.CODE),]
+disp_events_A09 <- disp_events[grepl("^A09",ATC.CODE),]
+```
 
 ## Link multiple data sources
 
@@ -1225,6 +1241,8 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
   
   })
 ```
+
+## Dealing with Polypharmacy
 
 ## 4. Reporting
 
