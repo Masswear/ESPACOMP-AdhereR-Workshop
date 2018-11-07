@@ -189,8 +189,7 @@ plot(cma7,
 - calculate medication event durations (if necessary)
 - check plausible values and correcting any deviations
 - handle missing data
-
-> see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345-54. https://doi.org/10.2217/cer-2015-0022.
+- see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345-54. https://doi.org/10.2217/cer-2015-0022.
 
 ## Select medication events
 
@@ -1051,10 +1050,10 @@ server <- function(input, output, session) {
 
 ## Initiation
 
-- Requires prescription and dispensing data - `medication_match()` function
+- Requires prescription and dispensing data - `compute.event.durations()` function
 
 - yes/no - availability of a dispensing date (within a period of time after prescription)
-- time to dispensing - `difftime(dispensing date, prescribing date, units="days")` 
+- time to dispensing - `time_to_initiation()` function
 
 
 ## Persistence
@@ -1197,6 +1196,8 @@ renderPlot({
 ## Longitudinal analysis 
 
 > - sliding windows - vary OW duration & lag
+> - for time-series, e.g. GEE
+> - group-based trajectory models
 
 ```{r, echo = FALSE}
 
@@ -1244,18 +1245,30 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
 
 ## Dealing with Polypharmacy
 
+- treatment-switches vs. two-drug regimens
+- summarizing multiple medications
+    + continuous: compute CMA for all treatments (without carryover for different treatments)
+    + continuous: compute the mean for individual CMAs (unweighted)
+    + continuous: mean of individual CMAs, weighted by treatment episode (DPPR) 
+    + continuous: compute CMA for each treatment separately and consider only periods where all treatments were available 
+    + dichotomized: CMA for all treatments larger than cutoff
+
 ## 4. Reporting
 
 - describe data preparation choices
 - justify choice of functions 
 - report any sensitivity analyses
-- share the analysis code (and data, if permitted)
+- share the analysis code (and anonymized dataset, if possible)
 
 ## Take home messages
 
-- ...
-
+- Data Preparation & Exploration are essential for meaningful estimation of adherence
+- Meaningful Adherence estimation requires clear operationalization of the reported measure
+- AdhereR provides functions to prepare, analyze, and visualize EHD
+- AdhereR functions are flexible, transparent, and ensure reproducibility
 
 ## Practical session(s)
 
-- ...
+- interactive online-tutorial with example data (for novices)
+- commented R script to use within R Studio (for advanced R users)
+- R-Markdown document with explanations and code examples for reference
