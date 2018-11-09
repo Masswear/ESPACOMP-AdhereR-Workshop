@@ -1138,7 +1138,7 @@ TEs3<- compute.treatment.episodes(ExamplePats,
                                   followup.window.duration.unit = "days",
                                   date.format = "%m/%d/%Y");
 knitr::kable(
-  TEs3, table.attr = "style='width:30%;'", 
+  TEs3, table.attr = "style='width:25%;'", 
              caption = "<a name=\"Table-2\"></a>**Table 2.** Example output `compute.treatment.episodes()` function");
 ```
 
@@ -1147,7 +1147,7 @@ knitr::kable(
 > - CMA per episode
 
 ```{r, echo = FALSE}
-
+example_data <- med.events[med.events$PATIENT_ID == 37, ]
 example_data$rownr <- 1:nrow(example_data)
 dropdownButton(
  
