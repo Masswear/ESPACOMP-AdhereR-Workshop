@@ -101,7 +101,7 @@ LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
 
 ## Definitions: Adherence taxonomy
 
-- *Adherence* = the extent to which a patient's medication use corresponds to prescribed use, expressed as continuous multiple-interval measures of medication availability (CMA)
+- *Adherence* = the extent to which a patient's medication availability corresponds to prescribed regimens, expressed as continuous multiple-interval measures of medication availability (CMA)
 - *Initiation* = the length of time between the first prescribing event and the first dispensing event
 - *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
 - *Implementation* = Adherence during periods of persistence
@@ -1245,13 +1245,24 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
 
 ## Dealing with Polypharmacy
 
+- calculation of one single adherence value
+- two-step process
+	+ create treatment groups 
+	+ aggregate treatment groups into single adherence value
+	
+## Treatment groups
+
 - treatment-switches vs. two-drug regimens
-- summarizing multiple medications
-    + continuous: compute CMA for all treatments (without carryover for different treatments)
-    + continuous: compute the mean for individual CMAs (unweighted)
-    + continuous: mean of individual CMAs, weighted by treatment episode (DPPR) 
-    + continuous: compute CMA for each treatment separately and consider only periods where all treatments were available 
-    + dichotomized: CMA for all treatments larger than cutoff
+- decide which medications can be used interchangeably
+- e.g. based on ATC codes
+
+## Aggregation methods
+
+- CMA for periods with ANY treatment available
+- CMA for periods with ALL treatments available
+- Average of CMAs for individual treatments, unweighted
+- Average of CMAs for individual treatments, weighted by treatment episode (DPPR) 
+- Dichotomized: CMA for individual treatments larger than cutoff
 
 ## 4. Reporting
 
