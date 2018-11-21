@@ -13,31 +13,31 @@ knitr::opts_chunk$set(echo = FALSE)
 library(shinyWidgets)
 ```
 
-## So far...
+<!-- ## So far... -->
 
-Electronic monitoring data (EM):
+<!-- Electronic monitoring data (EM): -->
 
-- max zoom: each administration is recorded
-- analysis: 
-    - adherence characterises an individual over a time period: 
-        - 3M, 1M, 1W, between visits; 
-        - skipped doses, missed days, drug holidays; (time to) discontinuation
-    - adherence characterises a cohort/sample at a time t: 
-        - per day
-        - % individuals taking >= prescribed; survival curve
+<!-- - max zoom: each administration is recorded -->
+<!-- - analysis:  -->
+<!--     - adherence characterises an individual over a time period:  -->
+<!--         - 3M, 1M, 1W, between visits;  -->
+<!--         - skipped doses, missed days, drug holidays; (time to) discontinuation -->
+<!--     - adherence characterises a cohort/sample at a time t:  -->
+<!--         - per day -->
+<!--         - % individuals taking >= prescribed; survival curve -->
 
-## ... something completely different?
+<!-- ## ... something completely different? -->
 
-Electronic healthcare data (EHD): 
+<!-- Electronic healthcare data (EHD):  -->
 
-- zoom out: only prescription AND/OR dispensing data
-- analysis: 
-    - adherence characterizes an individual during a time period
-        - interval duration varies, commonly 6M - 2Y
-        - % medication availability (MPR, PDC, CMA), n refills; (time to) refill gap
-    - adherence characterises a cohort/sample at a time t:
-        - interval duration varies
-        - % individuals x% availability; % individuals persistent at time t
+<!-- - zoom out: only prescription AND/OR dispensing data -->
+<!-- - analysis:  -->
+<!--     - adherence characterizes an individual during a time period -->
+<!--         - interval duration varies, commonly 6M - 2Y -->
+<!--         - % medication availability (MPR, PDC, CMA), n refills; (time to) refill gap -->
+<!--     - adherence characterises a cohort/sample at a time t: -->
+<!--         - interval duration varies -->
+<!--         - % individuals x% availability; % individuals persistent at time t -->
 
 ## Why EHD?
 
@@ -54,11 +54,10 @@ Electronic healthcare data (EHD):
 
 ## Typically available information
 
-- Typically available information
-    + Patient identifier
-    + Date of event
-    + Type of medication
-    + Quantity prescribed/dispensed/billed
+- Patient identifier
+- Date of event
+- Type of medication
+- Quantity prescribed/dispensed/billed
     
 ## Methodology matters
 
@@ -101,10 +100,14 @@ LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
 
 ## Definitions: Adherence taxonomy
 
-- *Adherence* = the extent to which a patient's medication availability corresponds to prescribed regimens, expressed as continuous multiple-interval measures of medication availability (CMA)
-- *Initiation* = the length of time between the first prescribing event and the first dispensing event
-- *Persistence* = the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap,
-- *Implementation* = Adherence during periods of persistence
+- *Adherence*
+    + continuous multiple-interval measures of medication availability (CMA)
+- *Initiation*
+    + the length of time between the first prescribing event and the first dispensing event
+- *Persistence*
+    + the length of time with repeated medication events, before discontinuing for a time period longer than a pre-specified permissible gap
+- *Implementation*
+    + CMA during treatment episodes or observation windows with no treatment gaps longer than a pre-specified period
 
 ## ABC Taxonomy for EHD
 
@@ -182,6 +185,21 @@ plot(cma7,
 3. Adherence calculation
 4. Reporting
 
+## Prerequisits
+
+- The raw data (A),
+- A tidy data set (B),
+- A code book with all variables and values in the tidy data set,
+- A reproducible recipe how to go from A to B.
+
+## Why reproducibility is important
+
+<figure>
+<img src="figures/R_Rcorrect-1.png" style="width: 100%"/>
+<figcaption>Herndon, T., Ash, M., & Pollin, R. (2014). Cambridge journal of economics, 38(2), 257-279.</fugcaption>
+</figure>
+
+
 ## 1. Data preparation
 
 - selecting medication events applicable to the research question 
@@ -191,17 +209,16 @@ plot(cma7,
 - handle missing data
 - see Huang, Yunyu, Jaco Voorham, und Flora M Haaijer-Ruskamp. Journal of Comparative Effectiveness Research 5, Nr. 4 (27. Juni 2016): 345-54. https://doi.org/10.2217/cer-2015-0022.
 
-## Select medication events
+<!-- ## Select medication events -->
 
-```{r echo = TRUE}
-load("data/example_presc_events.RData")
-disp_events <- fread("data/example_disp_events.csv")
-
-str(presc_events)
-
-presc_events_A09 <- presc_events[grepl("^A09",ATC.CODE),]
-disp_events_A09 <- disp_events[grepl("^A09",ATC.CODE),]
-```
+<!-- # ```{r echo = TRUE} -->
+<!-- # load("data/durcomp.rda") -->
+<!-- #  -->
+<!-- # str(durcomp.prescribing) -->
+<!-- #  -->
+<!-- # durcomp.prescribing_A09 <- durcomp.prescribing[grepl("^A09",ATC.CODE),] -->
+<!-- # durcomp.dispensing_A09 <- durcomp.dispensing[grepl("^A09",ATC.CODE),] -->
+<!-- # ``` -->
 
 ## Link multiple data sources
 
@@ -209,8 +226,145 @@ disp_events_A09 <- disp_events[grepl("^A09",ATC.CODE),]
 - Prescription changes or hospitalizations affect adherence estimation
 - New AdhereR function to:
     1. automatically select the last prescribed dose to calculate supply duration,
-    2. check for prescription changes and hospitalizations during this period, and
+    2. check for prescription changes, hospitalizations, and other treatment interruptions during this period, and
     3. adjust the supply duration based on prescription changes and hospitalizations
+    
+    
+## Link multiple data sources
+
+
+```{r echo = FALSE}
+disp_val <- fread("data/Validation_Data_disp.csv")
+presc_val <- fread("data/Validation_Data_presc.csv")
+hosp_val <- fread("data/Validation_Data_hosp.csv")
+
+dropdownButton(
+ 
+  selectInput(inputId = "source", label = "Data source", 
+              choices = c("prescribing", "dispensing", "hospitalization"), selected = "prescribing"),
+  icon = icon("gear"),
+  width = "100px"
+  )
+
+renderDataTable({
+  if(input$source == "prescribing") {
+  data <- presc_val
+} else if(input$source == "dispensing") {
+  data <- disp_val
+} else if(input$source == "hospitalization") {
+  data <- hosp_val
+}
+  
+  data
+  
+}, options = list(pageLength = 5))
+
+```
+    
+## Link multiple data sources
+
+`compute_event_durations(disp.data, presc.data, hosp.data, ...)`
+
+```{r echo = FALSE}
+
+library(data.table)
+library(AdhereR)
+
+source("data/matching_function.R")
+
+example_data$rownr <- 1:nrow(example_data)
+
+dropdownButton(
+ 
+  checkboxInput(inputId = "hosp", label = "consider hospitalizations", value = FALSE),
+  checkboxInput(inputId = "force.init.presc", label = "force.init.presc", value = FALSE),
+  checkboxInput(inputId = "force.presc.renew", label = "force.presc.renew", value = FALSE),
+  checkboxInput(inputId = "split.on.dosage.change", label = "split.on.dosage.change", value = FALSE),
+  selectInput(inputId = "trt.interruption", label = "trt.interruption", 
+              choices = c("continue", "discard", "carryover"), selected = "continue"),
+  icon = icon("gear"),
+  width = "300px"
+  )
+
+renderPlot({
+  
+  if(input$hosp == TRUE){
+    hosp <- hosp_val
+  } else {hosp <- NULL}
+  
+  medication_events <- compute_event_durations(disp.data = disp_val,
+                                             presc.data = presc_val,
+                                             hosp.data = hosp,
+                                             ID.colname = "ID",
+                                             presc.date.colname = "DATE.PRESC",
+                                             disp.date.colname = "DATE.DISP",
+                                             date.format = "%d.%m.%Y",
+                                             medication.class.colname = "ATC.CODE",
+                                             total.dose.colname = "TOTAL.DOSE",
+                                             presc.daily.dose.colname = "DAILY.DOSE",
+                                             presc.duration.colname = "DURATION",
+                                             visit.colname = "VISIT",
+                                             force.init.presc = input$force.init.presc,
+                                             force.presc.renew = input$force.presc.renew,
+                                             split.on.dosage.change = input$split.on.dosage.change,
+                                             trt.interruption = input$trt.interruption,
+                                             suppress.warnings = FALSE,
+                                             return.data.table = TRUE)
+
+med_events <- na.omit(medication_events, cols = "DURATION")
+
+class <- data.table(ATC.CODE = unique(disp_val[,ATC.CODE]),
+                    class = substr(unique(disp_val[,ATC.CODE]), 1, 1))
+
+med_events <- merge(med_events, class, by = "ATC.CODE")
+
+cma0 <- CMA0(data=as.data.frame(med_events),
+             ID.colname="class",
+             event.date.colname="DISP.START",
+             event.duration.colname="DURATION",
+             event.daily.dose.colname="DAILY.DOSE",
+             medication.class.colname="ATC.CODE",
+             followup.window.start=0,
+             followup.window.start.unit="days",
+             followup.window.duration=2*365,
+             followup.window.duration.unit="days",
+             observation.window.start=0,
+             observation.window.start.unit="days",
+             observation.window.duration=365,
+             observation.window.duration.unit="days",
+             date.format="%Y-%m-%d",
+             summary="Base CMA")
+
+TEs <- unique(med_events[,.(class, START.PRESC, END.PRESC, DAILY.DOSE)])
+TEs[is.na(END.PRESC),END.PRESC := as.Date("2016-01-01")]
+
+med_events[,rownr := 1:nrow(med_events)]
+
+plot(cma0, col.cats = rainbow, show.legend = FALSE)
+for(i in 1:nrow(TEs)){
+  class.i = TEs[[i, "class"]]
+  bottom = head(med_events[class == class.i,"rownr"],1)
+  top = tail(med_events[class == class.i,"rownr"],1)
+  start = as.numeric(TEs[i, "START.PRESC"]-head(TEs[TEs$class == class, "START.PRESC"],1))
+  end = as.numeric(TEs[i, "END.PRESC"]-head(TEs[TEs$class == class, "START.PRESC"],1))
+  offset = min(TEs[["START.PRESC"]], na.rm = TRUE)-min(med_events[["DISP.START"]], na.rm = TRUE)
+
+  rect(xleft=start+offset, xright=end+offset, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)}
+if(!is.null(hosp)){
+for(i in 1:nrow(hosp_val)){
+
+  first_event <- min(med_events[["DISP.START"]], na.rm = TRUE)
+
+  bottom = head(med_events[,"rownr"],1)
+  top = tail(med_events[,"rownr"],1)
+  start = as.numeric(hosp_val[[i, "DATE.IN"]]-first_event)
+  end = as.numeric(hosp_val[[i, "DATE.OUT"]]-first_event)
+
+  rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(0,0,1,alpha = 0.5), border = NULL)}
+  }
+})
+```
+
 
 ## 2. Data exploration/Visualization {.build}
 
@@ -1031,7 +1185,7 @@ server <- function(input, output, session) {
   )
 ```
 
-## 3. Adherence calculation
+## 3. Adherence calculations
 
 * `AdhereR` estimates adherence as *Continuous Medication Availability* (CMA)
 * *simple* CMA measures: `CMA1` - `CMA9`
@@ -1048,12 +1202,82 @@ server <- function(input, output, session) {
     - *simple* CMA for sample that initiated and did not discontinue OR
     - *per episode* CMA identifies first treatment episodes then computes CMA for each
 
+## Implementation
+
+> - CMA per episode
+> - `CMA_per_episode(CMA, data, ...)`
+
+```{r, echo = FALSE}
+example_data <- med.events[med.events$PATIENT_ID == 37, ]
+example_data$rownr <- 1:nrow(example_data)
+dropdownButton(
+ 
+  checkboxInput(inputId = "carry_within1", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same1", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = TRUE),
+  checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = TRUE),
+    sliderInput("max_gap1", label = "Maximum permissible gap:",
+              min = 30, max = 365, value = 365, step = 5),
+
+  icon = icon("gear"),
+  width = "300px"
+  )
+
+renderPlot({
+
+   cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA9 to each treatment episode
+                        data=example_data,
+                        ID.colname="PATIENT_ID",
+                        event.date.colname="DATE",
+                        event.duration.colname="DURATION",
+                        event.daily.dose.colname="PERDAY",
+                        medication.class.colname="CATEGORY",
+                        carryover.within.obs.window = input$carry_within1,
+                        carry.only.for.same.medication = input$carry_same1,
+                        consider.dosage.change = input$dose_change1, # conditions on treatment episodes
+                        medication.change.means.new.treatment.episode = input$new_episode1,
+                        maximum.permissible.gap = as.numeric(input$max_gap1),
+                        maximum.permissible.gap.unit = "days",
+                        followup.window.start=0,
+                        followup.window.start.unit = "days",
+                        followup.window.duration = 365 * 2,
+                        followup.window.duration.unit = "days",
+                        observation.window.start=0, # OW start in days since earliest event
+                        observation.window.duration=365,
+                        date.format="%m/%d/%Y");
+
+  
+  plot(cmaE, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
+  
+  })
+```
+
 ## Initiation
 
-- Requires prescription and dispensing data - `compute.event.durations()` function
-
+- Requires prescription and dispensing data
 - yes/no - availability of a dispensing date (within a period of time after prescription)
 - time to dispensing - `time_to_initiation()` function
+
+## Time to initiation
+
+`time_to_initiation(disp.data, presc.data, ...)`
+
+```{r, echo = FALSE}
+
+
+time_init <- time_to_initiation(presc.data = presc_val,
+                                disp.data = disp_val,
+                                ID.colname = "ID",
+                                presc.start.colname = "DATE.PRESC",
+                                disp.date.colname = "DATE.DISP",
+                                medication.class.colnames = "ATC.CODE",
+                                date.format = "%d.%m.%Y",
+                                suppress.warnings = FALSE,
+                                return.data.table = TRUE)
+
+renderDataTable(time_init, options = list(pageLength=3))
+
+```
 
 
 ## Persistence
@@ -1067,15 +1291,17 @@ plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "bl
 ## Persistence 
 
 > - treatment episodes depend on max permissible gap
+> - `compute.treatment.episodes(data, ...)`
 
 ```{r, echo = FALSE}
-example_data$rownr <- 1:nrow(example_data)
+
 dropdownButton(
  
   checkboxInput(inputId = "carry_within", label = "Carry-over within OW", value = FALSE),
   checkboxInput(inputId = "carry_same", label = "Carry-over only for same medication", value = FALSE),
   checkboxInput(inputId = "dose_change", label = "Consider dosage change", value = TRUE),
   checkboxInput(inputId = "new_episode", label = "New episode after medication change", value = TRUE),
+  selectInput(inputId = "gap_unit", label = "Gap unit", choices = c("days", "percent"), selected = "days"),
     sliderInput("max_gap", label = "Maximum permissible gap:",
               min = 30, max = 360, value = 90, step = 5),
 
@@ -1084,6 +1310,7 @@ dropdownButton(
   )
 
 renderPlot({
+  example_data$rownr <- 1:nrow(example_data)
   TEs <- compute.treatment.episodes(example_data,
                                   ID.colname="PATIENT_ID",
                                   event.date.colname="DATE",
@@ -1095,9 +1322,11 @@ renderPlot({
                                   consider.dosage.change = input$dose_change, # dosage change starts new episode...
                                   medication.change.means.new.treatment.episode = input$new_episode, # & type change
                                   maximum.permissible.gap = as.numeric(input$max_gap), # & a gap longer than 180 days
-                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  maximum.permissible.gap.unit = input$gap_unit, # unit for the above (days)
                                   followup.window.start = 0, # 2-years FUW starts at earliest event
                                   followup.window.start.unit = "days",
+                                  observation.window.start=182, # OW start in days since earliest event
+                                  observation.window.duration=365,
                                   followup.window.duration = 720,
                                   followup.window.duration.unit = "days",
                                   date.format = "%m/%d/%Y")
@@ -1118,9 +1347,8 @@ renderPlot({
 
 ```{r, echo=FALSE, results='asis', }
 # Compute the treatment episodes for the two patients:
-ExamplePats <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
 
-TEs3<- compute.treatment.episodes(ExamplePats,
+TEs<- compute.treatment.episodes(example_data,
                                   ID.colname="PATIENT_ID",
                                   event.date.colname="DATE",
                                   event.duration.colname="DURATION",
@@ -1137,67 +1365,16 @@ TEs3<- compute.treatment.episodes(ExamplePats,
                                   followup.window.duration = 365 * 2,
                                   followup.window.duration.unit = "days",
                                   date.format = "%m/%d/%Y");
-knitr::kable(
-  TEs3, table.attr = "style='width:25%;'", 
-             caption = "<a name=\"Table-2\"></a>**Table 2.** Example output `compute.treatment.episodes()` function");
-```
 
-## Implementation
-
-> - CMA per episode
-
-```{r, echo = FALSE}
-example_data <- med.events[med.events$PATIENT_ID == 37, ]
-example_data$rownr <- 1:nrow(example_data)
-dropdownButton(
- 
-  checkboxInput(inputId = "carry_within1", label = "Carry-over within OW", value = FALSE),
-  checkboxInput(inputId = "carry_same1", label = "Carry-over only for same medication", value = FALSE),
-  checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = TRUE),
-  checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = TRUE),
-    sliderInput("max_gap1", label = "Maximum permissible gap:",
-              min = 30, max = 360, value = 90, step = 5),
-
-  icon = icon("gear"),
-  width = "300px"
-  )
-
-renderPlot({
-
-   cmaE <- CMA_per_episode(CMA="CMA9", # apply the simple CMA9 to each treatment episode
-                        data=example_data,
-                        ID.colname="PATIENT_ID",
-                        event.date.colname="DATE",
-                        event.duration.colname="DURATION",
-                        event.daily.dose.colname="PERDAY",
-                        medication.class.colname="CATEGORY",
-                        carryover.within.obs.window = input$carry_within1,
-                        carry.only.for.same.medication = input$carry_same1,
-                        consider.dosage.change = input$dose_change1, # conditions on treatment episodes
-                        medication.change.means.new.treatment.episode = input$new_episode1,
-                        maximum.permissible.gap = as.numeric(input$max_gap1),
-                        maximum.permissible.gap.unit = "days",
-                        followup.window.start=0,
-                        followup.window.start.unit = "days",
-                        followup.window.duration = 365 * 2,
-                        followup.window.duration.unit = "days",
-                        observation.window.start=0,
-                        observation.window.start.unit = "days",
-                        observation.window.duration=365*2,
-                        observation.window.duration.unit = "days",
-                        date.format="%m/%d/%Y");
-
-  
-  plot(cmaE, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
-  
-  })
+renderTable(TEs,
+            striped = TRUE,
+            width = '300px')
 ```
 
 ## Longitudinal analysis 
 
-> - sliding windows - vary OW duration & lag
-> - for time-series, e.g. GEE
-> - group-based trajectory models
+> - for time-series, (e.g., GEE), or group-based trajectory models
+> - `CMA_sliding_window(CMA.to.apply, data, ...)`
 
 ```{r, echo = FALSE}
 
