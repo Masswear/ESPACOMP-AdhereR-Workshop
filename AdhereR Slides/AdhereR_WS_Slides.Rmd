@@ -11,6 +11,15 @@ runtime: shiny
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(shinyWidgets)
+library(AdhereR)
+library(data.table)
+library(dplyr)
+library(kableExtra)
+source("data/matching_function.R")
+
+disp_val <- fread("data/Validation_Data_disp.csv")
+presc_val <- fread("data/Validation_Data_presc.csv")
+hosp_val <- fread("data/Validation_Data_hosp.csv")
 ```
 
 <!-- ## So far... -->
@@ -123,8 +132,7 @@ LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
 > - *Treatment episode* (TE)
 
 ```{r, warning=FALSE, fig.height=4}
-library(AdhereR)
-library(data.table)
+
 
 example_data <- med.events[med.events$PATIENT_ID == 37, ]
 
@@ -234,9 +242,7 @@ plot(cma7,
 
 
 ```{r echo = FALSE}
-disp_val <- fread("data/Validation_Data_disp.csv")
-presc_val <- fread("data/Validation_Data_presc.csv")
-hosp_val <- fread("data/Validation_Data_hosp.csv")
+
 
 dropdownButton(
  
@@ -269,8 +275,6 @@ renderDataTable({
 
 library(data.table)
 library(AdhereR)
-
-source("data/matching_function.R")
 
 example_data$rownr <- 1:nrow(example_data)
 
@@ -340,7 +344,7 @@ TEs[is.na(END.PRESC),END.PRESC := as.Date("2016-01-01")]
 
 med_events[,rownr := 1:nrow(med_events)]
 
-plot(cma0, col.cats = rainbow, show.legend = FALSE)
+plot(cma0, col.cats = rainbow, show.legend = FALSE, align.all.patients = FALSE)
 for(i in 1:nrow(TEs)){
   class.i = TEs[[i, "class"]]
   bottom = head(med_events[class == class.i,"rownr"],1)
@@ -1197,10 +1201,10 @@ server <- function(input, output, session) {
 
 ## Overall adherence - implementation & persistence
 
-- CMA itself makes no difference between implementation and persistence
+- CMA itself makes no difference between persistence/non-persistence
 - CMA = implementation only if sample/individual is on treatment
     - *simple* CMA for sample that initiated and did not discontinue OR
-    - *per episode* CMA identifies first treatment episodes then computes CMA for each
+    - *per episode* CMA first identifies treatment episodes then computes CMA for each
 
 ## Implementation
 
@@ -1208,7 +1212,7 @@ server <- function(input, output, session) {
 > - `CMA_per_episode(CMA, data, ...)`
 
 ```{r, echo = FALSE}
-example_data <- med.events[med.events$PATIENT_ID == 37, ]
+# example_data <- med.events[med.events$PATIENT_ID == 76, ]
 example_data$rownr <- 1:nrow(example_data)
 dropdownButton(
  
@@ -1342,46 +1346,27 @@ renderPlot({
   rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)}
   })
 ```
-
 ## Persistence output
 
 ```{r, echo=FALSE, results='asis', }
 # Compute the treatment episodes for the two patients:
+kable(TEs, "html") %>%
+  kable_styling(bootstrap_options = "striped", font_size = 18)
 
-TEs<- compute.treatment.episodes(example_data,
-                                  ID.colname="PATIENT_ID",
-                                  event.date.colname="DATE",
-                                  event.duration.colname="DURATION",
-                                  event.daily.dose.colname="PERDAY",
-                                  medication.class.colname="CATEGORY",
-                                  carryover.within.obs.window = TRUE, # carry-over into the OW
-                                  carry.only.for.same.medication = TRUE, # & only for same type
-                                  consider.dosage.change = TRUE, # dosage change starts new episode...
-                                  medication.change.means.new.treatment.episode = TRUE, # & type change
-                                  maximum.permissible.gap = 180, # & a gap longer than 180 days
-                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
-                                  followup.window.start = 0, # 2-years FUW starts at earliest event
-                                  followup.window.start.unit = "days",
-                                  followup.window.duration = 365 * 2,
-                                  followup.window.duration.unit = "days",
-                                  date.format = "%m/%d/%Y");
-
-renderTable(TEs,
-            striped = TRUE,
-            width = '300px')
 ```
 
 ## Longitudinal analysis 
 
 > - for time-series, (e.g., GEE), or group-based trajectory models
-> - `CMA_sliding_window(CMA.to.apply, data, ...)`
+> - `CMA_sliding_window(CMA.to.apply="CMA9", data, ...)`
 
 ```{r, echo = FALSE}
+example_data <- example_data[example_data$PATIENT_ID == 37,]
 
 example_data$rownr <- 1:nrow(example_data)
 dropdownButton(
  
-  checkboxInput(inputId = "carry_within2", label = "Carry-over within OW", value = FALSE),
+  
   checkboxInput(inputId = "carry_same2", label = "Carry-over only for same medication", value = FALSE),
   checkboxInput(inputId = "dose_change2", label = "Consider dosage change", value = TRUE),
 sliderInput("SW_dur", label = "Sliding window duration:",
@@ -1401,9 +1386,8 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
                            event.duration.colname="DURATION",
                            event.daily.dose.colname="PERDAY",
                            medication.class.colname="CATEGORY",
-                           carryover.within.obs.window = input$carry_within2,
-                        carry.only.for.same.medication = input$carry_same2,
-                        consider.dosage.change = input$dose_change2, 
+                           carry.only.for.same.medication = input$carry_same2,
+                           consider.dosage.change = input$dose_change2, 
                            followup.window.start=0,
                            observation.window.start=0,
                            observation.window.duration=365*2,
