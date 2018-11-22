@@ -34,14 +34,23 @@ durcomp.dispensing[durcomp.dispensing$ID == 1,]
 
 # in the output of the str() function for the dispensing table, we see that the format of DATE.DISP is year-month-day, and ATC.CODE and UNIT are character (chr); we could change this as follows:
 
-durcomp.prescribing[,`:=` (DATE.PRESC = as.Date(DATE.PRESC, format = "%d.%m.%Y"), #convert Date to date format day-month-year
+durcomp.prescribing[,`:=` (DATE.PRESC = as.Date(DATE.PRESC, format = "%d.%m.%Y"), #convert Date to date format dd.mm.yyyy
                           ATC.CODE = as.factor(ATC.CODE), #convert ATC-Code to factor variable
                           UNIT = as.factor(UNIT) #convert UNIT to factor variable
 )]
-durcomp.dispensing[,`:=` (DATE.DISP = as.Date(DATE.DISP, format = "%d.%m.%Y"), #convert Date to date format day-month-year
+durcomp.dispensing[,`:=` (DATE.DISP = as.Date(DATE.DISP, format = "%d.%m.%Y"), #convert Date to date format dd.mm.yyyy
                    ATC.CODE = as.factor(ATC.CODE), #convert ATC-Code to factor variable
                    UNIT = as.factor(UNIT) #convert UNIT to factor variable
 )]
+
+# summary for the prescriptions?
+summary(durcomp.prescribing)
+
+# summary for the dispensings?
+summary(durcomp.dispensing)
+
+# we only want to keep chronic medications without a prescribed end-date
+presc_selection <- durcomp.prescribing[PRESC.DURATION > 30 | is.na(PRESC.DURATION)]
 
 # Note: depending on the 'messiness' of the raw data, other data cleaning steps might be required, like excluding/replacing impossible values, processing open text fields, etc. 
 
@@ -77,7 +86,7 @@ summary(event_durations)
 
 
 # here we decide to exclude all records with duration missing (NA)
-event_durations <- event_durations[!is.na(event_durations$DURATION),]
+event_durations <- na.omit(event_durations, cols = "DURATION")
 
 # check again the summary of your variables - some start and end dates for prescriptions missing, but all good apart from that
 summary(event_durations)
@@ -171,7 +180,14 @@ cma7 <- CMA7(med_events_A09,
 plot(cma7, 
     patients.to.plot=c("8"), 
      show.legend=FALSE);
-# this patient over 3 years from the first prescription date has a CMA7 of 32.9%, but we see from the plot that adherence varied in time: the medication was dispensed a while after the prescription, there is a gap before the last 5 dispensation, and another after the last dispensing event; there is also a variation in delays to refill during periods of relatively regular dispensing. This suggests that it is important to describe in more detail the stages of adherence (initiation, implementation and non-persistence), and to ensure that the period on which we compute adherence corresponds with the period on which we have data recorded for each patient
+# this patient over 3 years from the first prescription date has a CMA7 of 32.9%, 
+# but we see from the plot that adherence varied in time: the medication was dispensed 
+# a while after the prescription, there is a gap before the last 5 dispensation, and another
+# after the last dispensing event; there is also a variation in delays to refill during periods
+# of relatively regular dispensing. This suggests that it is important to describe in more detail
+# the stages of adherence (initiation, implementation and non-persistence), and to ensure that the
+# period on which we compute adherence corresponds with the period on which we have data recorded
+# for each patient.
 
 
 ##############
@@ -215,7 +231,8 @@ TEs<- compute.treatment.episodes(med_events_A09,
 View(TEs)
 
 # we have now a dataset with several TEs per person, episode duration can be considered as time to discontinuation
-# we can summarize the episode duration - the main variable we are interested in, for example in survival analysis (time to event)
+# we can summarize the episode duration - the main variable we are interested in, for example in survival
+# analysis (time to event)
 summary(TEs$episode.duration)
 hist(TEs$episode.duration)
 
@@ -284,8 +301,6 @@ View(cmaW$CMA)
 # we see that this patient had variable adherence during the follow-up period
 summary(cmaW$CMA$CMA[cmaW$CMA$ID==7])
 hist(cmaW$CMA$CMA[cmaW$CMA$ID==7])
-
-
 
 
 # we can use this variable in a similar way as for the EM data, for example in a GEE model(script adapted from the EM demo)
