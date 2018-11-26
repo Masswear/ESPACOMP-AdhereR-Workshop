@@ -21,17 +21,26 @@ table(durcomp.prescribing$ID, exclude=NULL)
 # how do the prescriptions look for the first patient?
 durcomp.prescribing[durcomp.prescribing$ID == 1,]
 
+# summary of all variables in prescribing data
+summary(durcomp.prescribing)
+
 # how many dispensings for each patient?
 table(durcomp.dispensing$ID, exclude=NULL)
 
 # how do the dispensings look for the first patient?
 durcomp.dispensing[durcomp.dispensing$ID == 1,]
 
+# summary of all variables in dispensing data
+summary(durcomp.dispensing)
+
 # how many hospitalisations?
 table(durcomp.hospitalisation$ID, exclude=NULL)
 
 # and for the first patient?
 durcomp.hospitalisation[durcomp.hospitalisation$ID == 1,]
+
+# summary of all variables in hospitalisation data
+summary(durcomp.hospitalisation)
 
 ####################
 # prepare the data #
@@ -48,12 +57,15 @@ durcomp.dispensing[,`:=` (DATE.DISP = as.Date(DATE.DISP, format = "%d.%m.%Y"), #
                    UNIT = as.factor(UNIT) #convert UNIT to factor variable
 )]
 
-# Note: depending on the 'messiness' of the raw data, other data cleaning steps might be required, like excluding/replacing impossible values, processing open text fields, etc. 
+# we only want to keep prescriptions with a intended duration of longer than 30 days
+durcomp.prescribing.select <- durcomp.prescribing[PRESC.DURATION > 30 | is.na(PRESC.DURATION)]
 
+# Note: depending on the 'messiness' of the raw data, other data cleaning steps might be required,
+# like excluding/replacing impossible values, processing open text fields, etc. 
 
 # Merge dispensing and prescription data:
 event_durations <- compute_event_durations(disp.data = durcomp.dispensing, 
-                                           presc.data = durcomp.prescribing, 
+                                           presc.data = durcomp.prescribing.select, 
                                            hosp.data = durcomp.hospitalisation, 
                                            ID.colname = "ID", 
                                            presc.date.colname = "DATE.PRESC", 
@@ -80,9 +92,11 @@ summary(event_durations)
 # Miss.patterns <- md.pattern(as.matrix(event_durations)) 
 # Miss.patterns
 
-
 # here we decide to exclude all records with duration missing (NA)
-event_durations <- event_durations[!is.na(event_durations$DURATION),]
+event_durations <- na.omit(event_durations, cols = "DURATION")
+
+# we also have to exclude events with a duration of 0
+event_durations <- event_durations[DURATION != 0,]
 
 # check again the summary of your variables - some start and end dates for prescriptions missing, but all good apart from that
 summary(event_durations)
@@ -91,7 +105,7 @@ summary(event_durations)
 
 cma0 <- CMA0(data=event_durations, # use the two selected patients
              ID.colname="ID", # the name of the column containing the IDs
-             event.date.colname="DATE.DISP", # the name of the column containing the event date
+             event.date.colname="DISP.START", # the name of the column containing the event date
              event.duration.colname="DURATION", # the name of the column containing the duration
              event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
              medication.class.colname="ATC.CODE"); # the name of the column containing the category
@@ -118,7 +132,7 @@ med_events_A09 <- event_durations[grepl("^A09A",ATC.CODE),]
 
 cma0 <- CMA0(data= med_events_A09, # use the two selected patients
              ID.colname="ID", # the name of the column containing the IDs
-             event.date.colname="DATE.DISP", # the name of the column containing the event date
+             event.date.colname="DISP.START", # the name of the column containing the event date
              event.duration.colname="DURATION", # the name of the column containing the duration
              event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
              medication.class.colname="ATC.CODE"); # the name of the column containing the category
@@ -139,7 +153,7 @@ dev.off()
 plot_interactive_cma(data=med_events_A09,
                      cma.class="simple",
                      ID.colname="ID",
-                     event.date.colname="DATE.DISP",
+                     event.date.colname="DISP.START",
                      event.duration.colname="DURATION",
                      event.daily.dose.colname="DAILY.DOSE",
                      medication.class.colname="ATC.CODE");
@@ -156,7 +170,7 @@ plot_interactive_cma(data=med_events_A09,
 
 cma7 <- CMA7(med_events_A09,
              ID.colname="ID",
-             event.date.colname="DATE.DISP",
+             event.date.colname="DISP.START",
              event.duration.colname="DURATION",
              event.daily.dose.colname="DAILY.DOSE",
              medication.class.colname="ATC.CODE",
@@ -171,16 +185,23 @@ plot(cma7,
     patients.to.plot=c("8"), 
      show.legend=FALSE);
 
-# this patient over 3 years from the first prescription date has a CMA7 of 22.6%, but we see from the plot that adherence varied in time: the medication was dispensed a while after the prescription, there is a gap before the last 5 dispensation, and another after the last dispensing event; there is also a variation in delays to refill during periods of relatively regular dispensing. This suggests that it is important to describe in more detail the stages of adherence (initiation, implementation and non-persistence), and to ensure that the period on which we compute adherence corresponds with the period on which we have data recorded for each patient
+# this patient over 3 years from the first prescription date has a CMA7 of 22.6%,
+# but we see from the plot that adherence varied in time: the medication was dispensed a while after the prescription,
+# there is a gap before the last 5 dispensation, and another after the last dispensing event;
+# there is also a variation in delays to refill during periods of relatively regular dispensing.
+# This suggests that it is important to describe in more detail the stages of adherence 
+# (initiation, implementation and non-persistence), and to ensure that the period on which we compute
+# adherence corresponds with the period on which we have data recorded for each patient
 
 
 ##############
 # Initiation #
 ##############
 
-# the function time_to_initiation calculates the time between the prescription date and the dispensation date, for prescriptions that are dispensed
-# Note; for non-initiation, prescriptions which are not dispensed appear as is.na(DATE.DISP) in the output of the compute_event_duration function.
-
+# the function time_to_initiation calculates the time between the prescription date and the dispensation date,
+# for prescriptions that are dispensed.
+# Note; for non-initiation, prescriptions which are not dispensed appear as is.na(DATE.DISP) in the output of the
+# compute_event_duration function.
 
 time_init <- time_to_initiation(presc.data = durcomp.prescribing[grepl("^A09A",ATC.CODE),], 
                                 disp.data = event_durations[!is.na(event_durations$DURATION) & grepl("^A09A",ATC.CODE),],
@@ -202,25 +223,26 @@ hist(time_init$time.to.initialization)
 
 TEs<- compute.treatment.episodes(med_events_A09,
                                  ID.colname="ID",
-                                 event.date.colname="DATE.DISP",
+                                 event.date.colname="DISP.START",
                                  event.duration.colname="DURATION",
                                  event.daily.dose.colname="DAILY.DOSE",
                                  medication.class.colname="ATC.CODE",
                                  carryover.within.obs.window = TRUE, # carry-over into the OW
                                  carry.only.for.same.medication = TRUE, # not applicable to the example
                                  consider.dosage.change = TRUE, # not applicable to the example
-                                  medication.change.means.new.treatment.episode = TRUE, # not applicable to the example
-                                  maximum.permissible.gap = 90, # & a gap longer than 90 days
-                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
-                                  followup.window.start = 0, # 2-years FUW starts at earliest event
-                                  followup.window.start.unit = "days",
-                                  followup.window.duration = 365 * 2,
-                                  followup.window.duration.unit = "days");
+                                 medication.change.means.new.treatment.episode = TRUE, # not applicable to the example
+                                 maximum.permissible.gap = 90, # & a gap longer than 90 days
+                                 maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                 followup.window.start = 0, # 2-years FUW starts at earliest event
+                                 followup.window.start.unit = "days",
+                                 followup.window.duration = 365 * 2,
+                                 followup.window.duration.unit = "days");
 # see the first lines of the resulting dataset
 head(TEs)
 
 # we have now a dataset with several TEs per person, episode duration can be considered as time to discontinuation
-# we can summarize the episode duration - the main variable we are interested in, for example in survival analysis (time to event)
+# we can summarize the episode duration - the main variable we are interested in, for example in survival analysis
+# (time to event)
 summary(TEs$episode.duration)
 hist(TEs$episode.duration)
 
@@ -232,7 +254,7 @@ hist(TEs$episode.duration)
 cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA7 to each treatment episode
                         as.data.frame(med_events_A09),
                         ID.colname="ID",
-                        event.date.colname="DATE.DISP",
+                        event.date.colname="DISP.START",
                         event.duration.colname="DURATION",
                         event.daily.dose.colname="DAILY.DOSE",
                         medication.class.colname="ATC.CODE",
@@ -258,15 +280,18 @@ plot(cmaE,
 str(cmaE);
 # the CMA estimates table can be called with:
 head(cmaE$CMA)
-# Note: you will see that 3 treatment episodes consist of a single dispensation: you might decide to exclude these, if you assume that medication initiation requires a second dispensation to attest engagement with the treatment prescribed
+# Note: you will see that 3 treatment episodes consist of a single dispensation: you might decide to exclude these,
+# if you assume that medication initiation requires a second dispensation to attest engagement with the treatment
+# prescribed
 
 
-# assuming that all patients were engaged in regular use of medication over a period of 2 years and we have complete data from all sources, we can compute multiple values per patient per observation window
+# assuming that all patients were engaged in regular use of medication over a period of 2 years and we have complete data
+# from all sources, we can compute multiple values per patient per observation window
 
 cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", 
                            as.data.frame(med_events_A09),
                            ID.colname="ID",
-                           event.date.colname="DATE.DISP",
+                           event.date.colname="DISP.START",
                            event.duration.colname="DURATION",
                            event.daily.dose.colname="DAILY.DOSE",
                            medication.class.colname="ATC.CODE",
@@ -295,7 +320,6 @@ head(cmaW$CMA)
 # we see that this patient had variable adherence during the follow-up period
 summary(cmaW$CMA$CMA[cmaW$CMA$ID==7])
 hist(cmaW$CMA$CMA[cmaW$CMA$ID==7])
-
 
 
 ##################
@@ -340,7 +364,6 @@ for (i in 1:m) {exe80[i] <- mean(cmaW$CMA$CMA_80[cmaW$CMA$window.ID==t[i]],na.rm
 plot(t,exe,type="l",ylim=c(0,1),xlab="Time (sliding windows)",ylab="Implementation",col="pink",lwd=2)
 par(new=TRUE)
 plot(t,exe80,type="l",ylim=c(0,1),xlab="Time (sliding windows)",ylab="Implementation",col="blue",lwd=2)
-
 
 # polynomial GEE #
 
@@ -405,4 +428,55 @@ CI
 
 lines(t,CI$lower,col=2,lwd=2,lty=2)
 lines(t,CI$upper,col=2,lwd=2,lty=2)
+
+##################
+#  Polypharmacy  #
+##################
+
+# To assess adherence to multiple medications, we have to create treatment groups.
+# We create treatment groups based on level 4 of the ATC classification (chemical subgroup)
+event_durations[,group := substr(ATC.CODE,1,5)]
+
+table(event_durations$group)
+
+# Different treatments might be prescribed for various prescription episodes. 
+# We want to calculate CMAs for each prescription episode separately, so we
+# need to add a duration for each prescription episode (with a maximum of 1 year). 
+
+event_durations <- event_durations[!is.na(START.PRESC)] #select only events during prescription periods
+event_durations[,PRESC.DURATION := pmin(as.numeric(END.PRESC - START.PRESC), 365, na.rm=TRUE)]
+
+# Now we can calculate CMAs by treatment group and prescription episode,
+# using our preferred CMA function with some data.table syntax
+
+CMA7_by_group <- event_durations[,getCMA(CMA7(data = as.data.frame(c(.BY, .SD)),
+                                              ID.colname = "ID",
+                                              event.date.colname = "DISP.START",
+                                              event.duration.colname = "DURATION",
+                                              medication.class.colname = "ATC.CODE",
+                                              observation.window.start = "START.PRESC",
+                                              observation.window.duration = "PRESC.DURATION",
+                                              observation.window.duration.unit = "days",
+                                              followup.window.start = as.Date("2056-01-01"),
+                                              followup.window.duration = 3*365,
+                                              followup.window.duration.unit = "days",
+                                              carry.only.for.same.medication = TRUE,
+                                              consider.dosage.change = FALSE,
+                                              force.NA.CMA.for.failed.patients = TRUE)),
+                                     by = .(group, START.PRESC, END.PRESC, PRESC.DURATION)]
+
+# Calculate mean adherence per group
+mean_CMA7_per_group <- CMA7_by_group[,mean(CMA, na.rm=TRUE), by = .(ID, group)]
+
+# Calculate mean adherence per patient
+
+mean_CMA7_per_patient <- mean_CMA7_per_group[,mean(V1, na.rm = TRUE), by = .(ID)]
+
+summary(mean_CMA7_per_patient$V1)
+hist(mean_CMA7_per_patient$V1)
+
+# We can see that for one patient, no CMA was calculated. This is because the first dispensing was more
+# than one year after the first prescription events and consequently outside the observation period.
+
+
 

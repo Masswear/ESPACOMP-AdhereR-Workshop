@@ -19,7 +19,7 @@ It contains a set of `R` `S3` *classes* and *functions* that *compute*, *summari
 
 This tutorial aims to introduce researchers to the principles of EHD preparation required to estimate adherence with the AdhereR package. It uses example data to illustrate the various decisions required and their impact on estimates, starting with the visualization of medication events, computation of persistence (treatment episode length), and computation of adherence.
 
-Please contact us with suggestions, bug reports, comments (or even just to share your experiences using the package) either by e-mail (to Dan <ddediu@gmail.com>, Alexandra <alexadima@gmail.com> or Samuel (samuel.allemann@gmx.ch)) or using GitHub's reporting mechanism at our repository <https://github.com/ddediu/AdhereR>, which contains the full source code of the package. 
+Please contact us with suggestions, bug reports, comments (or even just to share your experiences using the package) either by e-mail (to Dan <ddediu@gmail.com>, Alexandra <alexadima@gmail.com> or Samuel <samuel.allemann@gmx.ch>) or using GitHub's reporting mechanism at our repository <https://github.com/ddediu/AdhereR>, which contains the full source code of the package. 
 
 ```{r quiz-1}
 quiz(

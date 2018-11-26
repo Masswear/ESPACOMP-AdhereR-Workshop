@@ -153,7 +153,7 @@ LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
 
 ```{r, warning=FALSE}
 renderPlot({
-example_data <- na.omit(medication_events[grepl("^A09A",ATC.CODE) & ID == 8,], cols = "DURATION")
+example_data <- na.omit(medication_events[grepl("^R03AC",ATC.CODE) & ID == 16,], cols = "DURATION")
 
 example_data$rownr <- 1:nrow(example_data)
 
@@ -163,8 +163,8 @@ TEs <- compute.treatment.episodes(example_data,
                                   event.duration.colname="DURATION",
                                   event.daily.dose.colname="DAILY.DOSE",
                                   medication.class.colname="ATC.CODE",
-                                  carryover.within.obs.window = TRUE, # carry-over inside the OW
-                                  carry.only.for.same.medication = TRUE, # & only for same type
+                                  carryover.within.obs.window = FALSE, # carry-over inside the OW
+                                  carry.only.for.same.medication = FALSE, # & only for same type
                                   consider.dosage.change = TRUE, # dosage change starts new episode...
                                   medication.change.means.new.treatment.episode = TRUE, # & type change
                                   maximum.permissible.gap = 90, # & a gap longer than 180 days
@@ -425,7 +425,7 @@ for(i in 1:nrow(hosp_val)){
 ```{r, echo=FALSE, fig.show='hold', fig.cap = "<a name=\"Figure-1\"></a>**Figure 1.** Medication histories - two example patients"}
 # Create an object "cma0" of the most basic CMA type, "CMA0":
 
-example_data <- na.omit(medication_events[grepl("^R03",ATC.CODE) & ID %in% c(11,14) & DURATION != 0,], cols = "DURATION")
+example_data <- na.omit(medication_events[grepl("^R03AC",ATC.CODE) & ID %in% c(7,16) & DURATION != 0,], cols = "DURATION")
 
   cma0 <- CMA0(data=example_data, # use the two selected patients
              ID.colname="ID", # the name of the column containing the IDs
@@ -1281,8 +1281,8 @@ cma7 <- CMA7(data=example_data,
 
 ```{r, echo = FALSE}
 
-time_init <- time_to_initiation(presc.data = durcomp.prescribing[grepl("^A09A",ATC.CODE),],
-                                disp.data = durcomp.dispensing[grepl("^A09A",ATC.CODE),],
+time_init <- time_to_initiation(presc.data = durcomp.prescribing[grepl("^R03AC",ATC.CODE),],
+                                disp.data = durcomp.dispensing[grepl("^R03AC",ATC.CODE),],
                                 ID.colname = "ID",
                                 presc.start.colname = "DATE.PRESC",
                                 disp.date.colname = "DATE.DISP",
@@ -1309,7 +1309,6 @@ renderPlot({
 
 ## Persistence
 
-> - treatment episodes depend on max permissible gap
 > - `compute.treatment.episodes(data, ...)`
 
 ```{r, echo = FALSE}
@@ -1345,8 +1344,8 @@ renderPlot({
                                     followup.window.start = 0, # 2-years FUW starts at earliest event
                                     followup.window.start.unit = "days",
                                     observation.window.start=0, # OW start in days since earliest event
-                                    observation.window.duration=720,
-                                    followup.window.duration = 720,
+                                    observation.window.duration=365*3,
+                                    followup.window.duration = 365*3,
                                     followup.window.duration.unit = "days",
                                     date.format = "%Y-%m-%d")
 
@@ -1397,7 +1396,7 @@ kable(TEs, "html") %>%
 
 dropdownButton(
 
-  checkboxInput(inputId = "carry_within1", label = "Carry-over within OW", value = FALSE),
+  selectInput(inputId = "cma", label = "CMA to apply", choices = c("CMA1", "CMA2", "CMA3", "CMA4", "CMA5", "CMA6", "CMA7", "CMA8", "CMA9"), selected = "CMA7"),
   checkboxInput(inputId = "carry_same1", label = "Carry-over only for same medication", value = FALSE),
   checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = FALSE),
   checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = FALSE),
@@ -1409,17 +1408,16 @@ dropdownButton(
   )
 
 renderPlot({
-  example_data <- example_data[ID == 11, ]
+  example_data <- example_data[ID == 16, ]
   example_data$rownr <- 1:nrow(example_data)
 
-   cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA9 to each treatment episode
+   cmaE <- CMA_per_episode(CMA=input$cma, # apply the simple CMA9 to each treatment episode
                         data=as.data.frame(example_data),
                         ID.colname="ID",
                         event.date.colname="DATE.DISP",
                         event.duration.colname="DURATION",
                         event.daily.dose.colname="DAILY.DOSE",
                         medication.class.colname="ATC.CODE",
-                        carryover.within.obs.window = input$carry_within1,
                         carry.only.for.same.medication = input$carry_same1,
                         consider.dosage.change = input$dose_change1, # conditions on treatment episodes
                         medication.change.means.new.treatment.episode = input$new_episode1,
@@ -1427,10 +1425,10 @@ renderPlot({
                         maximum.permissible.gap.unit = "days",
                         followup.window.start=0,
                         followup.window.start.unit = "days",
-                        followup.window.duration = 365 * 2,
+                        followup.window.duration = 365 * 3,
                         followup.window.duration.unit = "days",
                         observation.window.start=0, # OW start in days since earliest event
-                        observation.window.duration=365*2,
+                        observation.window.duration=365*3,
                         date.format="%Y-%m-%d");
 
 
@@ -1460,7 +1458,7 @@ sliderInput("SW_step", label = "Sliding window step:",
 
 renderPlot({
   
-  example_data <- example_data[ID == 11,]
+  example_data <- example_data[ID == 16,]
   example_data$rownr <- 1:nrow(example_data)
 
 cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each sliding window
