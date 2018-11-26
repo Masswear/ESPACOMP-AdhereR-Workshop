@@ -17,6 +17,27 @@ library(dplyr)
 library(kableExtra)
 source("data/matching_function.R")
 
+load("data/durcomp.rda")
+
+medication_events <- compute_event_durations(disp.data = durcomp.dispensing, 
+                                           presc.data = durcomp.prescribing, 
+                                           hosp.data = durcomp.hospitalisation, 
+                                           ID.colname = "ID", 
+                                           presc.date.colname = "DATE.PRESC", 
+                                           disp.date.colname = "DATE.DISP", 
+                                           date.format = "%Y-%m-%d",
+                                           medication.class.colnames = c("ATC.CODE", "UNIT", "FORM"), 
+                                           total.dose.colname = "TOTAL.DOSE", 
+                                           presc.daily.dose.colname = "DAILY.DOSE", 
+                                           presc.duration.colname = "PRESC.DURATION", 
+                                           visit.colname = "VISIT", 
+                                           force.init.presc = TRUE, 
+                                           force.presc.renew = TRUE, 
+                                           split.on.dosage.change = TRUE, 
+                                           trt.interruption = "continue", 
+                                           suppress.warnings = FALSE, 
+                                           return.data.table = TRUE)
+
 disp_val <- fread("data/Validation_Data_disp.csv")
 presc_val <- fread("data/Validation_Data_presc.csv")
 hosp_val <- fread("data/Validation_Data_hosp.csv")
@@ -77,10 +98,9 @@ hosp_val <- fread("data/Validation_Data_hosp.csv")
 
 ## Example: Method-related variation in adherence to sibutramine
 
-<img src="figures/hess_example.JPG" style="width: 100%"/>
+<img src="figures/hess_example.JPG" style="width: 80%"/>
 
 LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
-
 
 ## AdhereR
 
@@ -131,19 +151,18 @@ LM Hess - 2006. https://doi.org/10.1345/aph.1H018.
 > - *Observation window* (OW)
 > - *Treatment episode* (TE)
 
-```{r, warning=FALSE, fig.height=4}
-
-
-example_data <- med.events[med.events$PATIENT_ID == 37, ]
+```{r, warning=FALSE}
+renderPlot({
+example_data <- na.omit(medication_events[grepl("^A09A",ATC.CODE) & ID == 8,], cols = "DURATION")
 
 example_data$rownr <- 1:nrow(example_data)
 
 TEs <- compute.treatment.episodes(example_data,
-                                  ID.colname="PATIENT_ID",
-                                  event.date.colname="DATE",
+                                  ID.colname="ID",
+                                  event.date.colname="DATE.DISP",
                                   event.duration.colname="DURATION",
-                                  event.daily.dose.colname="PERDAY",
-                                  medication.class.colname="CATEGORY",
+                                  event.daily.dose.colname="DAILY.DOSE",
+                                  medication.class.colname="ATC.CODE",
                                   carryover.within.obs.window = TRUE, # carry-over inside the OW
                                   carry.only.for.same.medication = TRUE, # & only for same type
                                   consider.dosage.change = TRUE, # dosage change starts new episode...
@@ -154,36 +173,39 @@ TEs <- compute.treatment.episodes(example_data,
                                   followup.window.start.unit = "days",
                                   followup.window.duration = 720,
                                   followup.window.duration.unit = "days",
-                                  date.format = "%m/%d/%Y")
+                                  date.format = "%Y-%m-%d")
 
 cma7 <- CMA7(data=example_data, # use the two selected patients
-             ID.colname="PATIENT_ID", # the name of the column containing the IDs
-             event.date.colname="DATE", # the name of the column containing the event date
-             event.duration.colname="DURATION", # the name of the column containing the duration
-             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
-             medication.class.colname="CATEGORY", # the name of the column containing the category
+             ID.colname="ID",
+             event.date.colname="DATE.DISP",
+             event.duration.colname="DURATION",
+             event.daily.dose.colname="DAILY.DOSE",
+             medication.class.colname="ATC.CODE", # the name of the column containing the category
              followup.window.start=0,  # FUW start in days since earliest event
-             observation.window.start=180, # OW start in days since earliest event
+             followup.window.duration = 720,
+             followup.window.duration.unit = "days",
+             observation.window.start=as.Date("2057-01-01", format = "%Y-%m-%d"), # OW start in days since earliest event
              observation.window.duration=365, # OW duration in days
-             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+             date.format="%Y-%m-%d"); # date format (mm/dd/yyyy)
 
-plot(cma7,
+  plot(cma7,
      show.legend = FALSE,
      show.cma = FALSE,
      show.event.intervals = FALSE,
      print.CMA = FALSE,
      plot.CMA = FALSE,
      col.cats = c("red", "blue"))
-# for(i in 1:nrow(TEs)){
-#   id = TEs[i, "PATIENT_ID"]
-#   bottom = head(example_data[example_data$PATIENT_ID == id,"rownr"],1)
-#   top = tail(example_data[example_data$PATIENT_ID == id,"rownr"],1)
-#   start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
-#   end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
-# 
-#   rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)
-# }
+for(i in 1:nrow(TEs)){
+  id = TEs[i, "ID"]
+  bottom = head(example_data[ID == id,"rownr"],1)
+  top = tail(example_data[ID == id,"rownr"],1)
+  start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$ID == id, "episode.start"],1), "days"))
+  end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$ID == id, "episode.start"],1), "days"))
 
+  rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, border = "blue", lty = "dashed", lwd = 2)
+}
+  
+})
 ```
 
 ## Working with AdhereR
@@ -203,7 +225,7 @@ plot(cma7,
 ## Why reproducibility is important
 
 <figure>
-<img src="figures/R_Rcorrect-1.png" style="width: 100%"/>
+<img src="figures/R_Rcorrect-1.png" style="width: 80%"/>
 <figcaption>Herndon, T., Ash, M., & Pollin, R. (2014). Cambridge journal of economics, 38(2), 257-279.</fugcaption>
 </figure>
 
@@ -228,6 +250,35 @@ plot(cma7,
 <!-- # durcomp.dispensing_A09 <- durcomp.dispensing[grepl("^A09",ATC.CODE),] -->
 <!-- # ``` -->
 
+## R Basics: structure of analysis (1/2)
+
+- load necessary packages
+    + `library(Adherer)`
+    + `library(data.table)`
+- import data
+    + `load("path/to/data.rda")` to load R data objects
+    + `fread("path/to/data.csv")` to import csv-files
+    + `dbConnect(...)` to connect to a (remote) database
+
+## R Basics: Data structures
+
+>- data.frames or data.tables hold the data similar to an excel spreadsheet
+    + each row is an observation
+    + each column is a variable
+
+```{r}
+str(medication_events)
+```
+
+## R Basics: structure of analysis (2/2)
+
+- manipulate data
+    + `data.table` syntax: `data[*subset*, *do*, *by*]`
+- store results
+    + Basic `R` syntax: `object <- function(data, argument)`
+    + `save(data, ... , file="path/to/file.rda")` to save R data object
+    + `write.csv(data, file = "path.to.file.csv")` to export to csv-file
+
 ## Link multiple data sources
 
 - Necessary data recorded in different databases
@@ -236,17 +287,14 @@ plot(cma7,
     1. automatically select the last prescribed dose to calculate supply duration,
     2. check for prescription changes, hospitalizations, and other treatment interruptions during this period, and
     3. adjust the supply duration based on prescription changes and hospitalizations
-    
-    
+
 ## Link multiple data sources
 
 
 ```{r echo = FALSE}
-
-
 dropdownButton(
- 
-  selectInput(inputId = "source", label = "Data source", 
+
+  selectInput(inputId = "source", label = "Data source",
               choices = c("prescribing", "dispensing", "hospitalization"), selected = "prescribing"),
   icon = icon("gear"),
   width = "100px"
@@ -254,19 +302,19 @@ dropdownButton(
 
 renderDataTable({
   if(input$source == "prescribing") {
-  data <- presc_val
+  data <- durcomp.prescribing
 } else if(input$source == "dispensing") {
-  data <- disp_val
+  data <- durcomp.dispensing
 } else if(input$source == "hospitalization") {
-  data <- hosp_val
+  data <- durcomp.hospitalisation
 }
-  
+
   data
-  
-}, options = list(pageLength = 5))
+
+}, options = list(pageLength = 3))
 
 ```
-    
+
 ## Link multiple data sources
 
 `compute_event_durations(disp.data, presc.data, hosp.data, ...)`
@@ -276,26 +324,24 @@ renderDataTable({
 library(data.table)
 library(AdhereR)
 
-example_data$rownr <- 1:nrow(example_data)
-
 dropdownButton(
- 
+
   checkboxInput(inputId = "hosp", label = "consider hospitalizations", value = FALSE),
   checkboxInput(inputId = "force.init.presc", label = "force.init.presc", value = FALSE),
   checkboxInput(inputId = "force.presc.renew", label = "force.presc.renew", value = FALSE),
   checkboxInput(inputId = "split.on.dosage.change", label = "split.on.dosage.change", value = FALSE),
-  selectInput(inputId = "trt.interruption", label = "trt.interruption", 
+  selectInput(inputId = "trt.interruption", label = "trt.interruption",
               choices = c("continue", "discard", "carryover"), selected = "continue"),
   icon = icon("gear"),
   width = "300px"
   )
 
 renderPlot({
-  
+
   if(input$hosp == TRUE){
     hosp <- hosp_val
   } else {hosp <- NULL}
-  
+
   medication_events <- compute_event_durations(disp.data = disp_val,
                                              presc.data = presc_val,
                                              hosp.data = hosp,
@@ -378,22 +424,21 @@ for(i in 1:nrow(hosp_val)){
 
 ```{r, echo=FALSE, fig.show='hold', fig.cap = "<a name=\"Figure-1\"></a>**Figure 1.** Medication histories - two example patients"}
 # Create an object "cma0" of the most basic CMA type, "CMA0":
-example_data <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
 
-cma0 <- CMA0(data=example_data, # use the two selected patients
-             ID.colname="PATIENT_ID", # the name of the column containing the IDs
-             event.date.colname="DATE", # the name of the column containing the event date
+example_data <- na.omit(medication_events[grepl("^R03",ATC.CODE) & ID %in% c(11,14) & DURATION != 0,], cols = "DURATION")
+
+  cma0 <- CMA0(data=example_data, # use the two selected patients
+             ID.colname="ID", # the name of the column containing the IDs
+             event.date.colname="DATE.DISP", # the name of the column containing the event date
              event.duration.colname="DURATION", # the name of the column containing the duration
-             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
-             medication.class.colname="CATEGORY", # the name of the column containing the category
-             followup.window.start=0,  # FUW start in days since earliest event
-             observation.window.start=182, # OW start in days since earliest event
-             observation.window.duration=365, # OW duration in days
-             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+             event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
+             medication.class.colname="ATC.CODE"); # date format (mm/dd/yyyy)
 
 # Plot the object (CMA0 shows the actual event data only):
+renderPlot({
 plot(cma0, # the object to plot
      align.all.patients=TRUE) # align all patients for easier comparison
+})
 
 ```
 
@@ -403,16 +448,16 @@ plot(cma0, # the object to plot
 # Interactive plotting of CMA per-treatment-episode
 # Please run only within RStudio!
 
-plot_interactive_cma_shiny <- function(data=med.events[med.events$PATIENT_ID %in% c(37, 76), ],
-                                       cma.class="per episode",
-                                       ID.colname="PATIENT_ID",
-                                       event.date.colname="DATE",
+plot_interactive_cma_shiny <- function(data=as.data.frame(na.omit(medication_events, cols = "DURATION")),
+                                       cma.class="simple",
+                                       ID.colname="ID",
+                                       event.date.colname="DATE.DISP",
                                        event.duration.colname="DURATION",
-                                       event.daily.dose.colname="PERDAY",
-                                       medication.class.colname="CATEGORY",
-                                       date.format="%m/%d/%Y",
+                                       event.daily.dose.colname="DAILY.DOSE",
+                                       medication.class.colname="ATC.CODE",
+                                       date.format="%Y-%m-%d",
                                        ID=NULL,
-                                       print.full.params=FALSE, 
+                                       print.full.params=FALSE,
                                        followup.window.start.max=5*365,
                                        followup.window.duration.max=5*365,
                                        observation.window.start.max=followup.window.start.max,
@@ -661,7 +706,7 @@ plot_interactive_cma_shiny <- function(data=med.events[med.events$PATIENT_ID %in
   .plotting.params <- plot_interactive_cma_shiny()
 
   shinyApp(
-    
+
     ui <- fluidPage(
 
 
@@ -1185,7 +1230,7 @@ server <- function(input, output, session) {
   })
 
 }
-    
+
   )
 ```
 
@@ -1195,7 +1240,7 @@ server <- function(input, output, session) {
 * *simple* CMA measures: `CMA1` - `CMA9`
     + Delimitation of OW,
     + Capping of CMA values,
-    + Carry-over of medication oversupply within the OW, and 
+    + Carry-over of medication oversupply within the OW, and
     + Carry-over of medication supply into OW.
 * *iterated* CMA measures: `CMA_per_episode` and `CMA_sliding_window`
 
@@ -1203,8 +1248,145 @@ server <- function(input, output, session) {
 
 - CMA itself makes no difference between persistence/non-persistence
 - CMA = implementation only if sample/individual is on treatment
-    - *simple* CMA for sample that initiated and did not discontinue OR
-    - *per episode* CMA first identifies treatment episodes then computes CMA for each
+    + *simple* CMA for sample that initiated and did not discontinue OR
+    + *per episode* CMA first identifies treatment episodes then computes CMA for each
+
+## Overall adherence with CMA7
+
+```{r, echo = TRUE}
+cma7 <- CMA7(data=example_data,
+             ID.colname="ID",
+             event.date.colname="DATE.DISP",
+             event.duration.colname="DURATION",
+             event.daily.dose.colname="DAILY.DOSE",
+             medication.class.colname="ATC.CODE",
+             carry.only.for.same.medication=FALSE,
+             consider.dosage.change=TRUE,
+             followup.window.start="START.PRESC",
+             followup.window.duration=3*365,
+             observation.window.start=0,
+             observation.window.duration=365,
+             date.format="%Y-%m-%d")
+```
+
+## Initiation
+
+- Requires prescription and dispensing data for the same follow-up period
+- yes/no - availability of a dispensing date (within a period of time after prescription)
+- time to dispensing - `time_to_initiation()` function
+
+## Time to initiation
+
+`time_to_initiation(disp.data, presc.data, ...)`
+
+```{r, echo = FALSE}
+
+time_init <- time_to_initiation(presc.data = durcomp.prescribing[grepl("^A09A",ATC.CODE),],
+                                disp.data = durcomp.dispensing[grepl("^A09A",ATC.CODE),],
+                                ID.colname = "ID",
+                                presc.start.colname = "DATE.PRESC",
+                                disp.date.colname = "DATE.DISP",
+                                medication.class.colnames = c("ATC.CODE", "FORM", "UNIT"),
+                                suppress.warnings = FALSE,
+                                return.data.table = TRUE)
+
+renderDataTable(time_init, options = list(pageLength=3))
+
+```
+
+
+## Persistence
+
+> - differentiate between persistence with treatment and quality of implementation
+
+```{r}
+renderPlot({
+  plot(cma0, align.all.patients=TRUE, show.legend = FALSE)
+
+})
+
+```
+
+## Persistence
+
+> - treatment episodes depend on max permissible gap
+> - `compute.treatment.episodes(data, ...)`
+
+```{r, echo = FALSE}
+
+dropdownButton(
+
+  checkboxInput(inputId = "carry_within", label = "Carry-over within OW", value = FALSE),
+  checkboxInput(inputId = "carry_same", label = "Carry-over only for same medication", value = FALSE),
+  checkboxInput(inputId = "dose_change", label = "Consider dosage change", value = FALSE),
+  checkboxInput(inputId = "new_episode", label = "New episode after medication change", value = FALSE),
+  selectInput(inputId = "gap_unit", label = "Gap unit", choices = c("days", "percent"), selected = "days"),
+    sliderInput("max_gap", label = "Maximum permissible gap:",
+              min = 30, max = 360, value = 90, step = 5),
+
+  icon = icon("gear"),
+  width = "300px"
+  )
+
+renderPlot({
+  example_data$rownr <- 1:nrow(example_data)
+  TEs <- compute.treatment.episodes(as.data.frame(example_data),
+                                    ID.colname="ID",
+                                    event.date.colname="DATE.DISP",
+                                    event.duration.colname="DURATION",
+                                    event.daily.dose.colname="DAILY.DOSE",
+                                    medication.class.colname="ATC.CODE",
+                                    carryover.within.obs.window = input$carry_within, # carry-over inside the OW
+                                    carry.only.for.same.medication = input$carry_same, # & only for same type
+                                    consider.dosage.change = input$dose_change, # dosage change starts new episode...
+                                    medication.change.means.new.treatment.episode = input$new_episode, # & type change
+                                    maximum.permissible.gap = as.numeric(input$max_gap), # & a gap longer than 180 days
+                                    maximum.permissible.gap.unit = input$gap_unit, # unit for the above (days)
+                                    followup.window.start = 0, # 2-years FUW starts at earliest event
+                                    followup.window.start.unit = "days",
+                                    observation.window.start=0, # OW start in days since earliest event
+                                    observation.window.duration=720,
+                                    followup.window.duration = 720,
+                                    followup.window.duration.unit = "days",
+                                    date.format = "%Y-%m-%d")
+
+  plot(cma0, align.all.patients=TRUE, show.legend = FALSE)
+    for(i in 1:nrow(TEs)){
+  id = TEs[i, "ID"]
+  bottom = head(example_data[ID == id,"rownr"],1)
+  top = tail(example_data[ID == id,"rownr"],1)
+  start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$ID == id, "episode.start"],1), "days"))
+  end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$ID == id, "episode.start"],1), "days"))
+
+  rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)}
+  })
+```
+
+## Persistence output
+
+```{r, echo=FALSE}
+
+TEs<- compute.treatment.episodes(as.data.frame(example_data),
+                                 ID.colname="ID",
+                                 event.date.colname="DATE.DISP",
+                                 event.duration.colname="DURATION",
+                                 event.daily.dose.colname="DAILY.DOSE",
+                                 medication.class.colname="ATC.CODE",
+                                 carryover.within.obs.window = TRUE, # carry-over into the OW
+                                 carry.only.for.same.medication = TRUE, # not applicable to the example
+                                 consider.dosage.change = TRUE, # not applicable to the example
+                                  medication.change.means.new.treatment.episode = TRUE, # not applicable to the example
+                                  maximum.permissible.gap = 90, # & a gap longer than 90 days
+                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
+                                  followup.window.start = 0, # 2-years FUW starts at earliest event
+                                  followup.window.start.unit = "days",
+                                  followup.window.duration = 365 * 3,
+                                  followup.window.duration.unit = "days");
+
+kable(TEs, "html") %>%
+  kable_styling(bootstrap_options = "striped", font_size = 18)
+
+```
 
 ## Implementation
 
@@ -1212,14 +1394,13 @@ server <- function(input, output, session) {
 > - `CMA_per_episode(CMA, data, ...)`
 
 ```{r, echo = FALSE}
-# example_data <- med.events[med.events$PATIENT_ID == 76, ]
-example_data$rownr <- 1:nrow(example_data)
+
 dropdownButton(
- 
+
   checkboxInput(inputId = "carry_within1", label = "Carry-over within OW", value = FALSE),
   checkboxInput(inputId = "carry_same1", label = "Carry-over only for same medication", value = FALSE),
-  checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = TRUE),
-  checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = TRUE),
+  checkboxInput(inputId = "dose_change1", label = "Consider dosage change", value = FALSE),
+  checkboxInput(inputId = "new_episode1", label = "New episode after medication change", value = FALSE),
     sliderInput("max_gap1", label = "Maximum permissible gap:",
               min = 30, max = 365, value = 365, step = 5),
 
@@ -1228,14 +1409,16 @@ dropdownButton(
   )
 
 renderPlot({
+  example_data <- example_data[ID == 11, ]
+  example_data$rownr <- 1:nrow(example_data)
 
    cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA9 to each treatment episode
-                        data=example_data,
-                        ID.colname="PATIENT_ID",
-                        event.date.colname="DATE",
+                        data=as.data.frame(example_data),
+                        ID.colname="ID",
+                        event.date.colname="DATE.DISP",
                         event.duration.colname="DURATION",
-                        event.daily.dose.colname="PERDAY",
-                        medication.class.colname="CATEGORY",
+                        event.daily.dose.colname="DAILY.DOSE",
+                        medication.class.colname="ATC.CODE",
                         carryover.within.obs.window = input$carry_within1,
                         carry.only.for.same.medication = input$carry_same1,
                         consider.dosage.change = input$dose_change1, # conditions on treatment episodes
@@ -1247,128 +1430,26 @@ renderPlot({
                         followup.window.duration = 365 * 2,
                         followup.window.duration.unit = "days",
                         observation.window.start=0, # OW start in days since earliest event
-                        observation.window.duration=365,
-                        date.format="%m/%d/%Y");
+                        observation.window.duration=365*2,
+                        date.format="%Y-%m-%d");
 
-  
+
   plot(cmaE, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
-  
+
   })
 ```
 
-## Initiation
-
-- Requires prescription and dispensing data
-- yes/no - availability of a dispensing date (within a period of time after prescription)
-- time to dispensing - `time_to_initiation()` function
-
-## Time to initiation
-
-`time_to_initiation(disp.data, presc.data, ...)`
-
-```{r, echo = FALSE}
-
-
-time_init <- time_to_initiation(presc.data = presc_val,
-                                disp.data = disp_val,
-                                ID.colname = "ID",
-                                presc.start.colname = "DATE.PRESC",
-                                disp.date.colname = "DATE.DISP",
-                                medication.class.colnames = "ATC.CODE",
-                                date.format = "%d.%m.%Y",
-                                suppress.warnings = FALSE,
-                                return.data.table = TRUE)
-
-renderDataTable(time_init, options = list(pageLength=3))
-
-```
-
-
-## Persistence
-
-> - differentiate between persistence with treatment and quality of implementation 
-
-```{r}
-plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
-```
-
-## Persistence 
-
-> - treatment episodes depend on max permissible gap
-> - `compute.treatment.episodes(data, ...)`
-
-```{r, echo = FALSE}
-
-dropdownButton(
- 
-  checkboxInput(inputId = "carry_within", label = "Carry-over within OW", value = FALSE),
-  checkboxInput(inputId = "carry_same", label = "Carry-over only for same medication", value = FALSE),
-  checkboxInput(inputId = "dose_change", label = "Consider dosage change", value = TRUE),
-  checkboxInput(inputId = "new_episode", label = "New episode after medication change", value = TRUE),
-  selectInput(inputId = "gap_unit", label = "Gap unit", choices = c("days", "percent"), selected = "days"),
-    sliderInput("max_gap", label = "Maximum permissible gap:",
-              min = 30, max = 360, value = 90, step = 5),
-
-  icon = icon("gear"),
-  width = "300px"
-  )
-
-renderPlot({
-  example_data$rownr <- 1:nrow(example_data)
-  TEs <- compute.treatment.episodes(example_data,
-                                  ID.colname="PATIENT_ID",
-                                  event.date.colname="DATE",
-                                  event.duration.colname="DURATION",
-                                  event.daily.dose.colname="PERDAY",
-                                  medication.class.colname="CATEGORY",
-                                  carryover.within.obs.window = input$carry_within, # carry-over inside the OW
-                                  carry.only.for.same.medication = input$carry_same, # & only for same type
-                                  consider.dosage.change = input$dose_change, # dosage change starts new episode...
-                                  medication.change.means.new.treatment.episode = input$new_episode, # & type change
-                                  maximum.permissible.gap = as.numeric(input$max_gap), # & a gap longer than 180 days
-                                  maximum.permissible.gap.unit = input$gap_unit, # unit for the above (days)
-                                  followup.window.start = 0, # 2-years FUW starts at earliest event
-                                  followup.window.start.unit = "days",
-                                  observation.window.start=182, # OW start in days since earliest event
-                                  observation.window.duration=365,
-                                  followup.window.duration = 720,
-                                  followup.window.duration.unit = "days",
-                                  date.format = "%m/%d/%Y")
-
-  plot(cma0, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
-    for(i in 1:nrow(TEs)){
-  id = TEs[i, "PATIENT_ID"]
-  bottom = head(example_data[example_data$PATIENT_ID == id,"rownr"],1)
-  top = tail(example_data[example_data$PATIENT_ID == id,"rownr"],1)
-  start = as.numeric(difftime(TEs[i, "episode.start"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
-  end = as.numeric(difftime(TEs[i, "episode.end"],head(TEs[TEs$PATIENT_ID == id, "episode.start"],1), "days"))
-  
-  rect(xleft=start, xright=end, ybottom=bottom-0.45, ytop=top+0.45, col = rgb(1,1,0,alpha = 0.2), border = "black", lty = "dashed", lwd = 0.1)}
-  })
-```
-## Persistence output
-
-```{r, echo=FALSE, results='asis', }
-# Compute the treatment episodes for the two patients:
-kable(TEs, "html") %>%
-  kable_styling(bootstrap_options = "striped", font_size = 18)
-
-```
-
-## Longitudinal analysis 
+## Longitudinal analysis
 
 > - for time-series, (e.g., GEE), or group-based trajectory models
 > - `CMA_sliding_window(CMA.to.apply="CMA9", data, ...)`
 
 ```{r, echo = FALSE}
-example_data <- example_data[example_data$PATIENT_ID == 37,]
-
-example_data$rownr <- 1:nrow(example_data)
 dropdownButton(
- 
-  
+
+
   checkboxInput(inputId = "carry_same2", label = "Carry-over only for same medication", value = FALSE),
-  checkboxInput(inputId = "dose_change2", label = "Consider dosage change", value = TRUE),
+  checkboxInput(inputId = "dose_change2", label = "Consider dosage change", value = FALSE),
 sliderInput("SW_dur", label = "Sliding window duration:",
               min = 1, max = 360, value = 90, step = 5),
 sliderInput("SW_step", label = "Sliding window step:",
@@ -1378,16 +1459,19 @@ sliderInput("SW_step", label = "Sliding window step:",
   )
 
 renderPlot({
+  
+  example_data <- example_data[ID == 11,]
+  example_data$rownr <- 1:nrow(example_data)
 
 cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each sliding window
-                           data=example_data,
-                           ID.colname="PATIENT_ID",
-                           event.date.colname="DATE",
+                           data=as.data.frame(example_data),
+                           ID.colname="ID",
+                           event.date.colname="DATE.DISP",
                            event.duration.colname="DURATION",
-                           event.daily.dose.colname="PERDAY",
-                           medication.class.colname="CATEGORY",
+                           event.daily.dose.colname="DAILY.DOSE",
+                           medication.class.colname="ATC.CODE",
                            carry.only.for.same.medication = input$carry_same2,
-                           consider.dosage.change = input$dose_change2, 
+                           consider.dosage.change = input$dose_change2,
                            followup.window.start=0,
                            observation.window.start=0,
                            observation.window.duration=365*2,
@@ -1397,10 +1481,10 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
                            sliding.window.duration.unit="days",
                            sliding.window.step.duration=as.numeric(input$SW_step),
                            sliding.window.step.unit="days",
-                           date.format="%m/%d/%Y");
-  
+                           date.format="%Y-%m-%d");
+
   plot(cmaW, align.all.patients=TRUE, show.legend = FALSE, col.cats = c("red", "blue"))
-  
+
   })
 ```
 
@@ -1408,9 +1492,9 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
 
 - calculation of one single adherence value
 - two-step process
-	+ create treatment groups 
+	+ create treatment groups
 	+ aggregate treatment groups into single adherence value
-	
+
 ## Treatment groups
 
 - treatment-switches vs. two-drug regimens
@@ -1422,15 +1506,16 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
 - CMA for periods with ANY treatment available
 - CMA for periods with ALL treatments available
 - Average of CMAs for individual treatments, unweighted
-- Average of CMAs for individual treatments, weighted by treatment episode (DPPR) 
+- Average of CMAs for individual treatments, weighted by treatment episode (DPPR)
 - Dichotomized: CMA for individual treatments larger than cutoff
 
 ## 4. Reporting
 
 - describe data preparation choices
-- justify choice of functions 
+- justify choice of functions
 - report any sensitivity analyses
 - share the analysis code (and anonymized dataset, if possible)
+- use RMarkdown to embed code and R plots in your reports
 
 ## Take home messages
 

@@ -1,14 +1,13 @@
 library(AdhereR)
 library(data.table)
+library(survival)
 library(gee)
 
 ##############
 # read data ##
 ##############
 
-load("./AdhereR Tutorial/data/durcomp.rda")
-
-# these are three datasets covering prescription, dispensation and hospitalisation events in a 2-year follow-up time window
+# these are three datasets covering prescription, dispensation and hospitalisation events in a 2-year follow-up time window, available in the AdhereR package
 str(durcomp.prescribing)
 str(durcomp.dispensing)
 str(durcomp.hospitalisation)
@@ -28,29 +27,26 @@ table(durcomp.dispensing$ID, exclude=NULL)
 # how do the dispensings look for the first patient?
 durcomp.dispensing[durcomp.dispensing$ID == 1,]
 
+# how many hospitalisations?
+table(durcomp.hospitalisation$ID, exclude=NULL)
+
+# and for the first patient?
+durcomp.hospitalisation[durcomp.hospitalisation$ID == 1,]
+
 ####################
 # prepare the data #
 ####################
 
 # in the output of the str() function for the dispensing table, we see that the format of DATE.DISP is year-month-day, and ATC.CODE and UNIT are character (chr); we could change this as follows:
 
-durcomp.prescribing[,`:=` (DATE.PRESC = as.Date(DATE.PRESC, format = "%d.%m.%Y"), #convert Date to date format dd.mm.yyyy
+durcomp.prescribing[,`:=` (DATE.PRESC = as.Date(DATE.PRESC, format = "%d.%m.%Y"), #convert Date to date format day-month-year
                           ATC.CODE = as.factor(ATC.CODE), #convert ATC-Code to factor variable
                           UNIT = as.factor(UNIT) #convert UNIT to factor variable
 )]
-durcomp.dispensing[,`:=` (DATE.DISP = as.Date(DATE.DISP, format = "%d.%m.%Y"), #convert Date to date format dd.mm.yyyy
+durcomp.dispensing[,`:=` (DATE.DISP = as.Date(DATE.DISP, format = "%d.%m.%Y"), #convert Date to date format day-month-year
                    ATC.CODE = as.factor(ATC.CODE), #convert ATC-Code to factor variable
                    UNIT = as.factor(UNIT) #convert UNIT to factor variable
 )]
-
-# summary for the prescriptions?
-summary(durcomp.prescribing)
-
-# summary for the dispensings?
-summary(durcomp.dispensing)
-
-# we only want to keep chronic medications without a prescribed end-date
-presc_selection <- durcomp.prescribing[PRESC.DURATION > 30 | is.na(PRESC.DURATION)]
 
 # Note: depending on the 'messiness' of the raw data, other data cleaning steps might be required, like excluding/replacing impossible values, processing open text fields, etc. 
 
@@ -86,7 +82,7 @@ summary(event_durations)
 
 
 # here we decide to exclude all records with duration missing (NA)
-event_durations <- na.omit(event_durations, cols = "DURATION")
+event_durations <- event_durations[!is.na(event_durations$DURATION),]
 
 # check again the summary of your variables - some start and end dates for prescriptions missing, but all good apart from that
 summary(event_durations)
@@ -98,17 +94,13 @@ cma0 <- CMA0(data=event_durations, # use the two selected patients
              event.date.colname="DATE.DISP", # the name of the column containing the event date
              event.duration.colname="DURATION", # the name of the column containing the duration
              event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
-             medication.class.colname="ATC.CODE", # the name of the column containing the category
-             followup.window.start=0,  # FUW start in days since earliest event
-             followup.window.duration=3*365, # OW duration in days
-             observation.window.start=0, # OW start in days since earliest event
-             observation.window.duration=3*365); # OW duration in days
+             medication.class.colname="ATC.CODE"); # the name of the column containing the category
 # Plot the object (CMA0 shows the actual event data only):
 pdf("Prescription-graphs.pdf", width = 8, height = 200)
 plot(cma0, # the object to plot
      show.legend= TRUE ,
      col.cats = rainbow, # not to show the legend
-     align.all.patients=FALSE); # align all patients for easier comparison
+     align.all.patients=FALSE); # show timelines relative to the earliest dispensation across patients 
 dev.off()
 
 # these patients are taking multiple medications in the same time:
@@ -117,6 +109,8 @@ table(event_durations$ATC.CODE, exclude=NULL)
 # to compute adherence, we need to select which medication we compute it for
 # for example, here we select treatments in the A09A class
 med_events_A09 <- event_durations[grepl("^A09A",ATC.CODE),]
+
+#med_events_A09 <- as.data.frame(med_events_A09)
 
 ######################
 # visualise the data #
@@ -127,17 +121,13 @@ cma0 <- CMA0(data= med_events_A09, # use the two selected patients
              event.date.colname="DATE.DISP", # the name of the column containing the event date
              event.duration.colname="DURATION", # the name of the column containing the duration
              event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
-             medication.class.colname="ATC.CODE", # the name of the column containing the category
-             followup.window.start=0,  # FUW start in days since earliest event
-             followup.window.duration=2*365, # OW duration in days
-             observation.window.start=0, # OW start in days since earliest event
-             observation.window.duration=2*365); # OW duration in days
+             medication.class.colname="ATC.CODE"); # the name of the column containing the category
 # Plot the object (CMA0 shows the actual event data only):
 pdf("Prescription-graphsA09.pdf", width = 8, height = 20)
 plot(cma0, # the object to plot
      show.legend= TRUE ,
      col.cats = rainbow, # not to show the legend
-     align.all.patients=FALSE); # align all patients for easier comparison
+     align.all.patients=TRUE); # show timelines relative to the earliest dispensation for each patient
 dev.off()
 
 # we can see that all patients had the medication dispensed more than once
@@ -180,30 +170,29 @@ cma7 <- CMA7(med_events_A09,
 plot(cma7, 
     patients.to.plot=c("8"), 
      show.legend=FALSE);
-# this patient over 3 years from the first prescription date has a CMA7 of 32.9%, 
-# but we see from the plot that adherence varied in time: the medication was dispensed 
-# a while after the prescription, there is a gap before the last 5 dispensation, and another
-# after the last dispensing event; there is also a variation in delays to refill during periods
-# of relatively regular dispensing. This suggests that it is important to describe in more detail
-# the stages of adherence (initiation, implementation and non-persistence), and to ensure that the
-# period on which we compute adherence corresponds with the period on which we have data recorded
-# for each patient.
+
+# this patient over 3 years from the first prescription date has a CMA7 of 22.6%, but we see from the plot that adherence varied in time: the medication was dispensed a while after the prescription, there is a gap before the last 5 dispensation, and another after the last dispensing event; there is also a variation in delays to refill during periods of relatively regular dispensing. This suggests that it is important to describe in more detail the stages of adherence (initiation, implementation and non-persistence), and to ensure that the period on which we compute adherence corresponds with the period on which we have data recorded for each patient
 
 
 ##############
 # Initiation #
 ##############
 
-# note: add initiation calculation: first row per patient, difftime( dispensing date, prescription date )
+# the function time_to_initiation calculates the time between the prescription date and the dispensation date, for prescriptions that are dispensed
+# Note; for non-initiation, prescriptions which are not dispensed appear as is.na(DATE.DISP) in the output of the compute_event_duration function.
 
-time_init <- AdhereR::time_to_initiation(presc.data = durcomp.prescribing, 
-                                disp.data = durcomp.dispensing, 
+
+time_init <- time_to_initiation(presc.data = durcomp.prescribing[grepl("^A09A",ATC.CODE),], 
+                                disp.data = event_durations[!is.na(event_durations$DURATION) & grepl("^A09A",ATC.CODE),],
                                 ID.colname = "ID", 
                                 presc.start.colname = "DATE.PRESC", 
                                 disp.date.colname = "DATE.DISP", 
-                                medication.class.colnames = c("ATC.CODE", "FORM", "UNIT"), 
-                                suppress.warnings = FALSE, 
-                                return.data.table = TRUE)
+                                medication.class.colnames = c("ATC.CODE", "FORM", "UNIT"))
+
+# we have now a dataset with a time to initiation per person
+str(time_init)
+summary(time_init$time.to.initialization)
+hist(time_init$time.to.initialization)
 
 ###############
 # Persistence #
@@ -227,12 +216,11 @@ TEs<- compute.treatment.episodes(med_events_A09,
                                   followup.window.start.unit = "days",
                                   followup.window.duration = 365 * 2,
                                   followup.window.duration.unit = "days");
-
-View(TEs)
+# see the first lines of the resulting dataset
+head(TEs)
 
 # we have now a dataset with several TEs per person, episode duration can be considered as time to discontinuation
-# we can summarize the episode duration - the main variable we are interested in, for example in survival
-# analysis (time to event)
+# we can summarize the episode duration - the main variable we are interested in, for example in survival analysis (time to event)
 summary(TEs$episode.duration)
 hist(TEs$episode.duration)
 
@@ -242,7 +230,7 @@ hist(TEs$episode.duration)
 ##################
 
 cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA7 to each treatment episode
-                        med_events_A09,
+                        as.data.frame(med_events_A09),
                         ID.colname="ID",
                         event.date.colname="DATE.DISP",
                         event.duration.colname="DURATION",
@@ -262,15 +250,21 @@ cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA7 to each treatment ep
                         observation.window.start.unit = "days",
                         observation.window.duration=365*3,
                         observation.window.duration.unit = "days");
+
 plot(cmaE, 
      patients.to.plot=c("8"), 
      show.legend=FALSE);
+# the output of the function includes several items
+str(cmaE);
+# the CMA estimates table can be called with:
+head(cmaE$CMA)
+# Note: you will see that 3 treatment episodes consist of a single dispensation: you might decide to exclude these, if you assume that medication initiation requires a second dispensation to attest engagement with the treatment prescribed
 
 
-# for patients who show a regular use of medication over the whole period (for example 7), multiple values per patient per observation window
+# assuming that all patients were engaged in regular use of medication over a period of 2 years and we have complete data from all sources, we can compute multiple values per patient per observation window
 
 cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", 
-                           med_events_A09,
+                           as.data.frame(med_events_A09),
                            ID.colname="ID",
                            event.date.colname="DATE.DISP",
                            event.duration.colname="DURATION",
@@ -286,7 +280,7 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9",
                            sliding.window.start.unit="days",
                            sliding.window.duration=60,
                            sliding.window.duration.unit="days",
-                           sliding.window.step.duration=60,
+                           sliding.window.step.duration=30,
                            sliding.window.step.unit="days");
 
 plot(cmaW, 
@@ -296,21 +290,57 @@ plot(cmaW,
 # the output of the function includes several items
 str(cmaW);
 # the CMA estimates table can be called with:
-View(cmaW$CMA)
+head(cmaW$CMA)
 
 # we see that this patient had variable adherence during the follow-up period
 summary(cmaW$CMA$CMA[cmaW$CMA$ID==7])
 hist(cmaW$CMA$CMA[cmaW$CMA$ID==7])
 
 
-# we can use this variable in a similar way as for the EM data, for example in a GEE model(script adapted from the EM demo)
 
-# plotting across time
+##################
+#  What's next?  #
+##################
+
+# we can use these variables in ways similar to the EM data
+
+# for treatment episode length: survival analysis up to end of first episode
+TEs1 <- TEs[TEs$episode.ID==1,]
+# compute variable censoring - if length of episode < observation window attribute value 2, rest is 1
+TEs1$censored <- 1
+TEs1$censored[TEs1$episode.duration < 2*365] <- 2
+table(TEs1$censored)
+
+# plot the survival curve
+plot(survfit(Surv(TEs1$episode.duration,TEs1$censored)~1),col=4,lwd=3,conf.int=F,xlim=c(0,750),ylim=c(0,1),xlab = "day",ylab="",mark.time=T)
+# you could continue to test with log-rank test - replace x with your variable
+# survdiff(Surv(TEs1$episode.duration,TEs1$censored)~x)
+# ... and adjust for covariates with Cox's proportional hasards regression - replace x and y with your main predictor & covariate(s)
+# coxph(Surv(time,status)~ x + y)
+
+
+# for implementation: a GEE model
+# Note: the script below is adapted from the EM demo for illustration purposes
+# Note2: CMA is a continuous variable with a non-normal distribution; we dichotomise it here at a 80% cutoff to obtain a binary variable as for the EM data; this is however not an endorsement of the 80% cutoff - we recommend exploring your data and choosing appropriate distribution families or cut-offs
+
+hist(cmaW$CMA$CMA)
+cmaW$CMA$CMA_80 <- 1
+cmaW$CMA$CMA_80[cmaW$CMA$CMA < 0.8] <- 0
+barplot(table(cmaW$CMA$CMA_80))
+
+# plotting across time for both average % implementation per period and % of patients with implementation >=80%
 t <- unique(cmaW$CMA$window.ID)
 m <- length(t)
 exe <- rep(NA,m)
+exe80 <- rep(NA,m)
 for (i in 1:m) {exe[i] <- mean(cmaW$CMA$CMA[cmaW$CMA$window.ID==t[i]],na.rm=T)}
+for (i in 1:m) {exe80[i] <- mean(cmaW$CMA$CMA_80[cmaW$CMA$window.ID==t[i]],na.rm=T)}
+
+# ploting both lines - binary variable gives lower estimates
 plot(t,exe,type="l",ylim=c(0,1),xlab="Time (sliding windows)",ylab="Implementation",col="pink",lwd=2)
+par(new=TRUE)
+plot(t,exe80,type="l",ylim=c(0,1),xlab="Time (sliding windows)",ylab="Implementation",col="blue",lwd=2)
+
 
 # polynomial GEE #
 
@@ -318,7 +348,7 @@ M0 <- cbind(1,cmaW$CMA$window.ID,cmaW$CMA$window.ID^2,cmaW$CMA$window.ID^3,cmaW$
             cmaW$CMA$window.ID^5,cmaW$CMA$window.ID^6,cmaW$CMA$window.ID^7)  # design matrix
 colnames(M0) <- c("Int","t","t2","t3","t4","t5","t6","t7") 
 
-out1 <- gee(CMA~M0-1,ID,family=quasi,data=cmaW$CMA,corstr="exchangeable")
+out1 <- gee(CMA_80~M0-1,ID,family=binomial,data=cmaW$CMA,corstr="exchangeable")
 summary(out1)
 beta <- summary(out1)$coef[,1]
 zstat <- summary(out1)$coef[,5]
@@ -330,20 +360,20 @@ cbind(beta,pvalue)
 
 repeat {
   M <- M0
-  out1 <- gee(CMA~M0-1,ID,family=quasi,data=cmaW$CMA,corstr="exchangeable")
+  out1 <- gee(CMA_80~M0-1,ID,family=binomial,data=cmaW$CMA,corstr="exchangeable")
   beta <- summary(out1)$coef[,1]
   zstat <- summary(out1)$coef[,5]
   pvalue <- 2*(1-pnorm(abs(zstat)))
   if (sum(pvalue<0.05)==length(pvalue)) break; 
-  M0 <- M[,-(1:length(pvalue))[pvalue==max(pvalue)]]}
+  M0 <- M[,-(1:length(pvalue))[pvalue==max(pvalue)]]
+  }
 
 cbind(beta,pvalue)
 
 
-
 # prediction of the model #
 
-pdata <- cbind(1,t^6,t^7)
+pdata <- cbind(t^5,t^6,t^7)
 mu.hat <- pdata%*%as.matrix(beta)
 pr <- plogis(mu.hat) 
 lines(t,pr,col=2,lwd=2)
@@ -351,40 +381,28 @@ lines(t,pr,col=2,lwd=2)
 
 # Confidence intervals around the prediction #
 
-co <- out1$robust.variance
-
-V0 <- co[1,1]+t^2*co[2,2]+t^4*co[3,3]+t^6*co[4,4]+t^8*co[5,5]+t^10*co[6,6]+
-  2*t*co[1,2]+2*t^2*co[1,3]+2*t^3*co[1,4]+2*t^4*co[1,5]+2*t^5*co[1,6]+
-  2*t^3*co[2,3]+2*t^4*co[2,4]+2*t^5*co[2,5]+2*t^6*co[2,6]+
-  2*t^5*co[3,4]+2*t^6*co[3,5]+2*t^7*co[3,6]+
-  2*t^7*co[4,5]+2*t^8*co[4,6]+
-  2*t^9*co[5,6]
-
-
-var.pred <- function(X,C) {
+CI.pred <- function(out,dat) {
   
-  dia <- matrix(NA,nrow(X),ncol(X))
+  C <- out$robust.variance
+  dia <- matrix(NA,nrow(dat),ncol(dat))
   for (i in 1:ncol(dia)) {
-    dia[,i] <- X[,i]^2*C[i,i] } 
+    dia[,i] <- dat[,i]^2*C[i,i] } 
   
-  ndia <- matrix(NA,nrow(X),sum(upper.tri(C)))
-  for (i in 1:(ncol(X)-1)) {for (j in ((i+1):ncol(X))) {
-    ndia[,(1:ncol(ndia))[ C[upper.tri(C)]==C[i,j]]] <- 2*X[,i]*X[,j]*C[i,j]}}
+  ndia <- matrix(NA,nrow(dat),sum(upper.tri(C)))
+  for (i in 1:(ncol(dat)-1)) {for (j in ((i+1):ncol(dat))) {
+    ndia[,(1:ncol(ndia))[ C[upper.tri(C)]==C[i,j]]] <- 2*dat[,i]*dat[,j]*C[i,j]}}
   
   Var <- apply(dia,1,sum)+apply(ndia,1,sum)
-  Var}
+  mu.l <- mu.hat - 2 * sqrt(Var) ; lower = plogis(mu.l)
+  mu.u <- mu.hat + 2 * sqrt(Var) ; upper = plogis(mu.u)
+  
+  I <- as.data.frame(cbind(lower,upper))
+  names(I) <- c("lower","upper")
+  I}
 
-V <- var.pred(pdata,co)
-se <- sqrt(V)
+CI <- CI.pred(out1,pdata)
+CI
 
-mu.l <- mu.hat - 2 * se
-mu.u <- mu.hat + 2 * se
-
-lcl = plogis(mu.l)
-ucl = plogis(mu.u)
-
-lines(1:m,ucl,col=2,lwd=2,lty=2)
-lines(1:m,lcl,col=2,lwd=2,lty=2)
-
-
+lines(t,CI$lower,col=2,lwd=2,lty=2)
+lines(t,CI$upper,col=2,lwd=2,lty=2)
 
