@@ -94,10 +94,6 @@ durcomp.prescribing[,`:=` (DATE.PRESC = as.Date(DATE.PRESC, format = "%d.%m.%Y")
 
 ####your code here####
 
-durcomp.dispensing[,`:=` (DATE.DISP = as.Date(DATE.DISP, format = "%d.%m.%Y"), #convert Date to date format day-month-year
-                   ATC.CODE = as.factor(ATC.CODE), #convert ATC-Code to factor variable
-                   UNIT = as.factor(UNIT) #convert UNIT to factor variable
-)]
 
 # Check format of variables:
 str(durcomp.dispensing)
@@ -163,9 +159,9 @@ summary(event_durations)
 
 ```
 
-The output of the `compute_event_durations` function contains some more columns with important information:
+In addition to columns extracted from the original datasets (patient ID, medication class, total dose, daily dose, dispensing date), the output of the `compute_event_durations` function contains some more columns with important information:
 
-- `DISP.START` :  A *Date* column with the start date of the dispensing event, either the same as in disp.date.colnema or a later date in case of dosage changes or treatment interruptions/hospitalizations. This will normally be the column used as the event date in further CMA calculations
+- `DISP.START` :  A *Date* column with the **adjusted** start date of the dispensing event, either the same as in `disp.date.colname` or a later date in case of dosage changes or treatment interruptions/hospitalizations. This will normally be the column used as the event date in further CMA calculations
 - `DURATION` : A *numeric* column with the calculated duration of the supply, based on the total dispensed dose and the prescribed daily dose, starting from the `DISP.START` date
 - `START.PRESC` : A *Date* column with the start date of a prescription episode
 - `END.PRESC` : A *Date* column with the end date of a prescription episode. If there is no end date, this will be `NA`
@@ -181,9 +177,6 @@ Before calculating adherence, we check the results of the `compute_event_duratio
 
 # Check output of matching function
 
-str(NULL)
-
-summary(NULL)
 
 ```
 
@@ -277,7 +270,7 @@ Several other decisions might need to be taken when calculating adherence, which
 
 - what OW is relevant for calculating adherence and persistence? 
 - is the largest interruption seen in patient `8` an indication of non-persistence, or of lower adherence over that time interval? 
-- is three switch between different medications of the same class or of different classes, and if so, is this an indicator of a new treatment episode? 
+- are there switches between different medications of the same class or of different classes, and if so, do they indicate new treatment episodes? 
 - is it necessary to consider carry-over of oversupply from previous events? 
 - it is necessary to consider carry-over also when medication changes? 
 

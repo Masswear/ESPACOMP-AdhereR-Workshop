@@ -440,7 +440,7 @@ If we have a dispensing and a prescription database, we can calculate time to in
 
 ### Exercise: Calculate time to initiation
 
-Compute time to initiation with the function `time_do_initiation()` for the two patients in `example_data`. Select only medications with the ATC code *R03AC12* (salmeterol). 
+Compute time to initiation with the function `time_to_initiation()` for the two patients in `example_data`. Select only medications with the ATC code *R03AC12* (salmeterol). 
 
 ```{r time-to-initiation, exercise = TRUE, exercise.setup = "subset_data"}
 

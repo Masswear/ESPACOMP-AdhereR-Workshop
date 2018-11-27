@@ -215,7 +215,7 @@ for(i in 1:nrow(TEs)){
 3. Adherence calculation
 4. Reporting
 
-## Prerequisits
+## Prerequisites
 
 - The raw data (A),
 - A tidy data set (B),
@@ -1524,6 +1524,6 @@ cmaW <- CMA_sliding_window(CMA.to.apply="CMA9", # apply the simple CMA9 to each 
 
 ## Practical session(s)
 
-- interactive online-tutorial with example data (for novices)
+- interactive online-tutorial with example data (for beginners)
 - commented R script to use within R Studio (for advanced R users)
 - R-Markdown document with explanations and code examples for reference

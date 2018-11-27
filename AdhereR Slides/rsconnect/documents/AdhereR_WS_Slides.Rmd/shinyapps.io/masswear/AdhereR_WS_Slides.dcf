@@ -5,8 +5,8 @@ account: masswear
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 441743
-bundleId: 1721757
+bundleId: 1723930
 url: https://masswear.shinyapps.io/AdhereR_WS_Slides/
-when: 1543266392.26303
+when: 1543342480.58023
 asMultiple: FALSE
 asStatic: FALSE

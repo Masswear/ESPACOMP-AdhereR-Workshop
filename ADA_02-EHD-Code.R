@@ -231,7 +231,7 @@ TEs<- compute.treatment.episodes(med_events_A09,
                                  carry.only.for.same.medication = TRUE, # not applicable to the example
                                  consider.dosage.change = TRUE, # not applicable to the example
                                  medication.change.means.new.treatment.episode = TRUE, # not applicable to the example
-                                 maximum.permissible.gap = 90, # & a gap longer than 90 days
+                                 maximum.permissible.gap = 180, # & a gap longer than 180 days
                                  maximum.permissible.gap.unit = "days", # unit for the above (days)
                                  followup.window.start = 0, # 2-years FUW starts at earliest event
                                  followup.window.start.unit = "days",
@@ -262,7 +262,7 @@ cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA7 to each treatment ep
                         carry.only.for.same.medication = FALSE,
                         consider.dosage.change = FALSE, # conditions on treatment episodes
                         medication.change.means.new.treatment.episode = TRUE,
-                        maximum.permissible.gap = 90,
+                        maximum.permissible.gap = 180,
                         maximum.permissible.gap.unit = "days",
                         followup.window.start=0,
                         followup.window.start.unit = "days",
@@ -428,6 +428,7 @@ CI
 
 lines(t,CI$lower,col=2,lwd=2,lty=2)
 lines(t,CI$upper,col=2,lwd=2,lty=2)
+
 
 ##################
 #  Polypharmacy  #
