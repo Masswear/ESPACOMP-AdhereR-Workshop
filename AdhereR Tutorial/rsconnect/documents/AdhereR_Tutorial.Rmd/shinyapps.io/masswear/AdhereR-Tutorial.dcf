@@ -1,0 +1,12 @@
+name: AdhereR-Tutorial
+title: AdhereR-Tutorial
+username:
+account: masswear
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 591641
+bundleId: 1722855
+url: https://masswear.shinyapps.io/AdhereR-Tutorial/
+when: 1543314289.83674
+asMultiple: FALSE
+asStatic: FALSE

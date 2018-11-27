@@ -1,5 +1,5 @@
 ---
-title: "AdhereR Tutorial"
+title: "AdhereR-Tutorial"
 output: 
   learnr::tutorial:
     progressive: true
@@ -10,6 +10,15 @@ runtime: shiny_prerendered
 ```{r setup, include=FALSE}
 library(learnr)
 knitr::opts_chunk$set(echo = FALSE)
+
+library(AdhereR)
+library(data.table)
+
+durcomp.dispensing <- AdhereR::durcomp.dispensing
+durcomp.prescribing <- AdhereR::durcomp.prescribing
+
+load("data/event_durations.rda")
+
 ```
 
 ## Introduction
@@ -54,28 +63,32 @@ quiz(
 )
 ```
 
-Oftentimes, datasets can be large with hundreds of thousands or even millions of rows. Provided that working memory is big enough to hold the entire dataset, R can handle it. Manipulating these large datasets with the standard R libraries can be a hassle. We propose to use the package `data.table`, which usually requires less memory and is faster than the standard `data.frame` format. However, AdhereR currently requires a `data.frame` as input, so remember to convert your final dataset with `as.data.frame()` before using the AdhereR functions!
+Oftentimes, datasets can be large with hundreds of thousands or even millions of rows. Provided that working memory is big enough to hold the entire dataset, R can handle it. `AdhereR` can even access data (read and write) stored in various types of databases, ranging from "classic" relational databases (such as `MySQL` and `SQLite`) to new approaches (such as Apache's `Hadoop`). This allows the seamless processing of very large datasets across many types of architectures, ranging from a consumer-grade laptop to large heterogeneous computer clusers, without loading the dataset in memory.
+
+When working in memory, manipulating large datasets with the standard R libraries can be a hassle. We propose to use the package `data.table`, which usually requires less memory and is faster than the standard `data.frame` format. 
 
 ### Example dataset
 
 Suppose you have a dataset with the following information:
 
-- patient unique identifier (`PATIENT.ID`), 
-- event date (`DATE.DISP`; date of dispensing, in the "mm.dd.yyyy" format),
-- ATC code (`ATC.CODE`; alpha-numeric code to identify the medication)
+- patient unique identifier (`ID`), 
+- event date (`DATE.DISP`; date of dispensing, in the "yyyy-mm-dd" format),
+- ATC code (`ATC.CODE`; alpha-numeric code to identify the medication),
+- Unit (`UNIT`; the unit of the dosage strength),
+- Form (`FORM`; the galenic form of the preparation),
 - dosage (`DOSE`; strength of the dispensed medication with unit), and
-- quantity (`QUANTITY`; number of units dispensed). 
+- quantity (`TOTAL.DOSE`; total dose (in units of `UNIT`) dispensed). 
 
-Table 1 shows the medication events of one example patient: 32 medication events related to 8 medications. 
+`AdhereR` contains an example dataset with just this information: `durcomp.dispensing`
+
+Table 1 shows the medication events of one example patient in `durcomp.dispensing`: 32 medication events related to 8 medications. 
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
 # Load the AdhereR and data.table libraries (and install if not already installed):
 if (!require("AdhereR")) install.packages("AdhereR")
 if (!require("data.table")) install.packages("data.table")
 
-# Load example dataset
-disp_events <- fread("data/example_disp_events.csv")
 # Display the data for the first patient:
-disp_events[PATIENT.ID == 42]
+durcomp.dispensing[ID == 1]
 ```
 
 ## Data preparation
@@ -86,18 +99,16 @@ First, we have to make sure that the data is in the right format. We can use the
 
 ```{r, echo=TRUE}
 # Check format of variables:
-str(disp_events)
+str(durcomp.dispensing)
 ```
 
-We can see that the `DATE.DISP` column is in *CHARACTER* instead of *DATE* format, and the `DOSE` is in *CHARACTER* format, too, because the unit is appended to it. 
+`R` treats the columns in a data.table as objects with a specific `class` attribute. The `class` describes the format of the column, similar to the *Cell Format* in Excel spreadsheets. In our dataset, there are two *numeric* columns: `ID` and `TOTAL.DOSE`. `DATE.DISP` is in *Date* format. And `ATC.CODE`, `UNIT`, and `FORM` columns are in *CHARACTER* format. 
 
 ### Exercise: examine data
 
-Write the command to display a summary of `disp_events`. Run your code by clicking on "Run Code" at the top right of the Code window. If you want to start over, click "Start Over", at the top left. Click the "Hint" button for Help.
+Write the command to display a summary of `durcomp.dispensing`. Run your code by clicking on "Run Code" at the top right of the Code window. If you want to start over, click "Start Over", at the top left. Click the "Hint" button for Help.
 
 ```{r summary_events, exercise=TRUE}
-disp_events <- fread("data/example_disp_events.csv")
-
 # Display summary of data:
 
 ```
@@ -107,168 +118,209 @@ disp_events <- fread("data/example_disp_events.csv")
 </div>
 
 ### Conversion of data types
- 
-We want to convert the `DATE.DISP` to the appropriate format and extract the numeric part and the characters from the `DOSE` variable into separate variables `DOSE.num` and `UNIT`. 
 
+Another special `R` class ist *factor*, which can be used for categorical data. It groups the data into a limited set of different *levels*, for example *male* and *female*.
+We want to convert the `ATC.CODE`, `UNIT`, and `FORM` columns to *FACTOR*. We can directly manipulate data in a `data.table`, using the following syntax: `DT[i, j, by]`. This tells `R` to take `DT` (the `data.table`), subset/reorder rows using `i`, then do `j`, grouped by `by`. In `i`, `j`, and `by`, we can referr to any column within `DT` using its name. We don't have to use all of `i`, `j`, and `by`; if we want to do something with all rows without grouping, we can just use `j` without `i` and `by`. An excellent introduction to `data.table` can be found [HERE](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html){target="_blank"}.
+
+To convert a column to a new class, we can do it directly inside the `data.table`, using the operator `:=`:
 ```{r, echo=TRUE}
 # Convert DATE to the DATE format and split DOSE into two variables:
-disp_events[, DATE.DISP := as.Date(DATE.DISP, format = "%d.%m.%Y")] #convert Date to date format
-
-disp_events[,c("DOSE.num", "UNIT"):= tstrsplit(DOSE, " ")] #split Dose on whitespace
-disp_events[,DOSE := NULL]
+durcomp.dispensing[, ATC.CODE := as.factor(ATC.CODE)] #convert ATC.CODE to factor
 ```
 
 ### Exercise: type conversion
 
-Write the commands to convert the `DOSE.num` variable to *NUMERIC* and the `UNIT` variable to *FACTOR*.
+Write the commands to convert the `UNIT`, and `FORM` columns to *FACTOR*.
 
 ```{r convert_variables, exercise=TRUE, exercise.eval=TRUE}
-# add the code to convert DOSE.num to numeric and UNIT to factor:
-
+# add the code to convert UNIT and FORM to factor:
 
 
 ```
 
 ```{r convert_variables-hint}
-disp_events[,`:=` (DOSE.num = as.numeric(DOSE.num) #convert DOSE.num to numeric
-                   )]
+# To manipulat multiple columns at the same time, use the following format:
+# DT[,`:=` (col1 = do(x), 
+#           col2 = do(y))]
 ```
 
-Now that the data is in the right format, we can see if there are any implausible or missing data from the summary.
-For example, we can see that all the dates appear to be from the years 2014-2016, which corresponds with our intended follow-up window. 
-
-### Reproducible and transparent data modifications
-
-There are 4 different units in the `UNIT` variable: *MG*, *MCG*, *MICROG*, and *UI*. *MCG* and *MICROG* both refer to the same unit, microgrammes, so there should be only one version of this unit. We could change the original data and replace all instances of *MCG* with *MICROG*, but one of the data cleaning principles is to never change the original data. Instead, we will modify the data transparently and reproducibly in our script. If there are a lot of modificiations, this could be in a separate file that contains only the modifications.
-
-We can use a named `list` to change the levels of a factor:
-
-```{r, echo=TRUE}
-# Assign *MCG* and *MICROG* to the same factor level
-levels(disp_events$UNIT) <- list(MICROG=c("MCG", "MICROG"), MG="MG", UI="UI")
-
-summary(disp_events)
-```
+Now that the data is in the right format, we can examine them for any implausible or missing data, using `summary`.
+For example, we can see that there are three different units: *MG*, *MICROG*, and *UI*. 
 
 ## Data processing
 
 ### Supply duration
 
-To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, but we only have the quantity. We could assume that patients need to administer one unit per day and use the `QUANTITY` variable, but oftentimes, this is not appropriate. Sometimes, standard doses, e.g. WHO's 'Defined Daily Dose' or other assumptions may be appropriate in some instances, but might introduce bias in other situations.
+To calculate CMAs, `AdhereR` requires a `DURATION` for each dispensing event, but we only have the total dispensed dose. If medications are not supplied for fixed durations but as a quantity that may last for various durations based on the prescribed dose, the supply duration has to be calculated based on dispensed and prescribed doses. Standard doses, e.g. WHO's *Defined Daily Dose* or other assumptions may be appropriate in some instances, but might introduce bias in other situations.
 
-For this tutorial, we have a second database where the prescribed dosage for each medication per patient is recorded: 
+With AdhereR comes a second sample database, `durcomp.prescribing`, with prescriptions for the same patients as in `durcomp.dispensing`: 
 
-- patient unique identifier (`PATIENT.ID`), 
+- patient unique identifier (`ID`), 
 - event date (`DATE.PRESC`; date of prescription, in the "mm/dd/yyyy" format),
-- ATC code (`ATC.CODE`; alpha-numeric code to identify the medication)
-- dosage (`DAILY.DOSE`; prescribed dose of the medication per day), and
-- unit (`UNIT`; unit of the prescribed dose). 
+- visit number (`VISIT`; the consecutive number of the prescription instances),
+- ATC code (`ATC.CODE`; alpha-numeric code to identify the medication),
+- Unit (`UNIT`; the unit of the dosage strength),
+- Form (`FORM`; the galenic form of the preparation),
+- prescription duration (`PRESC.DURATION` ; the duration (in days) for which the prescription is intended. Can be `NA` if the prescription is continuous without a fixed end date.), and
+- dosage (`DAILY.DOSE`; prescribed dose of the medication per day). 
 
-```{r, echo=TRUE}
+Table 2 shows the prescriptions for the first patient in `durcomp.prescribing`: 
+```{r, echo=FALSE}
 # Load example prescription data:
 
-load("data/example_presc_events.RData")
-
-presc_events
-
-```
-Conveniently, this dataset is already clean and all the data is in the right format. Moreover, there is only one prescription event per medication, which occured before the first dispensing event, so we don't have to deal with prescription changes during our follow-up period.
-
-### Merge prescription and dispensing data
-
-We can now merge the two datasets and calculate the duration for each dispensing event. We merge by `PATIENT.ID`, `ATC.CODE` code and `UNIT` to make sure that events are matched correctly. This is why it was necessary to clean up the units: Otherwise, some events might not merge correctly due to mismatches between the units.
-
-By default, the `merge` function only includes rows where the ID-variable are present in both instances. This means that we only capture medications that were prescribed and at least once dispensed during the follow-up period. If we want to capture all events, we can specify `all = TRUE` in the function arguments.
-
-### Exercise: Add daily doses from separate file
-
-Write the command to merge `disp_events` and `presc_events` by `PATIENT.ID`, `ATC.CODE` code and `UNIT` into a new object called `med_events`
-
-```{r merge-data, exercise=TRUE, exercise.eval=TRUE}
-# Merge dispensing and prescription data to create an object 'med_events':
-
-# Print the merged data.table 'med_events'
+durcomp.prescribing[ID==1]
 
 ```
 
-```{r merge-data-solution}
-# Merge dispensing and prescription data to create an object 'med_events':
-med_events <- merge(disp_events, presc_events, by = c("PATIENT.ID", "ATC.CODE", "UNIT"), all = TRUE, sort = FALSE)
+<!-- ### Merge prescription and dispensing data -->
 
-# Print the merged data.table 'med_events'
-med_events
-```
+<!-- We can now merge the two datasets and calculate the duration for each dispensing event. We merge by `PATIENT.ID`, `ATC.CODE` code and `UNIT` to make sure that events are matched correctly. This is why it was necessary to clean up the units: Otherwise, some events might not merge correctly due to mismatches between the units. -->
 
-### Exercise: Calculate supply duration
+<!-- By default, the `merge` function only includes rows where the ID-variable are present in both instances. This means that we only capture medications that were prescribed and at least once dispensed during the follow-up period. If we want to capture all events, we can specify `all = TRUE` in the function arguments. -->
 
-Now calculate the supply duration by multiplying the dispensed Dose and quantity and dividing it by the prescribed daily dose.
+<!-- ### Exercise: Add daily doses from separate file -->
 
-```{r, echo = FALSE}
-disp_events[,`:=` (DOSE.num = as.numeric(DOSE.num), #convert DOSE.num to numeric
-                   UNIT = as.factor(UNIT) #convert UNIT to factor variable
-                   )]
+<!-- Write the command to merge `disp_events` and `presc_events` by `PATIENT.ID`, `ATC.CODE` code and `UNIT` into a new object called `med_events` -->
 
-med_events <- merge(disp_events, presc_events, by = c("PATIENT.ID", "ATC.CODE", "UNIT"), all = TRUE, sort = FALSE)
-```
+<!-- ```{r merge-data, exercise=TRUE, exercise.eval=TRUE} -->
+<!-- # Merge dispensing and prescription data to create an object 'med_events': -->
+
+<!-- # Print the merged data.table 'med_events' -->
+
+<!-- ``` -->
+
+<!-- ```{r merge-data-solution} -->
+<!-- # Merge dispensing and prescription data to create an object 'med_events': -->
+<!-- med_events <- merge(disp_events, presc_events, by = c("PATIENT.ID", "ATC.CODE", "UNIT"), all = TRUE, sort = FALSE) -->
+
+<!-- # Print the merged data.table 'med_events' -->
+<!-- med_events -->
+<!-- ``` -->
+
+<!-- ### Exercise: Calculate supply duration -->
+
+<!-- Now calculate the supply duration by multiplying the dispensed Dose and quantity and dividing it by the prescribed daily dose. -->
+
+<!-- ```{r, echo = FALSE} -->
+<!-- disp_events[,`:=` (DOSE.num = as.numeric(DOSE.num), #convert DOSE.num to numeric -->
+<!--                    UNIT = as.factor(UNIT) #convert UNIT to factor variable -->
+<!--                    )] -->
+
+<!-- med_events <- merge(disp_events, presc_events, by = c("PATIENT.ID", "ATC.CODE", "UNIT"), all = TRUE, sort = FALSE) -->
+<!-- ``` -->
 
 
-```{r calculate-duration, exercise = TRUE, exercise.eval=TRUE}
-# Add a new column DURATION and Calculate the supply duration:
+<!-- ```{r calculate-duration, exercise = TRUE, exercise.eval=TRUE} -->
+<!-- # Add a new column DURATION and Calculate the supply duration: -->
 
-# Display a summary of the object 'med_events'
+<!-- # Display a summary of the object 'med_events' -->
 
-```
-```{r calculate-duration-solution}
-# Add a new column DURATION and Calculate the supply duration:
-med_events[,DURATION := (DOSE.num*QUANTITY)/DAILY.DOSE]
+<!-- ``` -->
+<!-- ```{r calculate-duration-solution} -->
+<!-- # Add a new column DURATION and Calculate the supply duration: -->
+<!-- med_events[,DURATION := (DOSE.num*QUANTITY)/DAILY.DOSE] -->
 
-# Display a summary of the object 'med_events'
-summary(med_events)
-```
+<!-- # Display a summary of the object 'med_events' -->
+<!-- summary(med_events) -->
+<!-- ``` -->
 
 ### Multiple data sources
 
-In its newest version, `AdhereR` now offers a function to link dispensing, prescription, and hospitalization data to improve the accuracy of adherence estimation. For each dispensing event, the function performs iterations of the following steps:
+In its newest version (0.3.1), `AdhereR` now offers a function to link dispensing, prescription, and hospitalisation data to improve the accuracy of adherence estimation. For each dispensing event, the function performs iterations of the following steps:
 
 1. automatically selects the last prescibed dose to calculate supply duration,
-2. checks for prescription changes and hospitalizations during this period, and
-3. adjusts the duration accordingly.
+2. checks for prescription changes, treatment interruptions, and hospitalisations during this period, and
+3. adjusts the duration according to arguments provided by the user.
 
 The function requires the following input:
 
-- `x` : A *data.frame* with the dispensing data
-- `y` : A *data.frame* with the prescription data
-- `z` : optional, a *data.frame* with the hospitalization data
-- `ID.var` : A *character vector* of the ID column (identical in all data sources)
-- `DATE.PRESC.var` : A *character vector* of the prescription date column (in y)
-- `DATE.DISP.var` : A *character vector* of the prescription date column (in x)
-- `DATE.format` : A *character vector* of the date format (identical in all data sources)
-- `CATEGORY.var` : A *character vector* of the medication identification column (identical for x and y)
-- `TOTAL.DOSE.var` : A *numeric vector* of the column with the dispensed dose (in x)
-- `PERDAY.var` : A *numeric vector* of the column with the daily prescribed dose (in y)
-- `PRESC.DURATION.var` : : optional, A *integer vector* of the column with the prescription duration in days (in y)
-- `UNIT.var` : optional, A *character vector* of the medication unit column (identical for x and y)
-- `FORM.var` : optional, A *character vector* of the medication form column (identical for x and y)
-- `VISIT.var` : optional, A *integer vector* of the visit number (in y)
-- `force.init.presc` : *logical*, default *TRUE*; should first prescibed dose be used for dispensing events occuring before the first prescription event?
-- `force.presc.renew` : *logical*, default *TRUE*; if a medication has not been prescribed during a prescription event, should its prescription end on this date?
-- `consider.dosage.change` : *logical*, default *TRUE*; should the supply duration be recalculated in case of prescription changes?
+- `disp.data` : A *data.frame* with the dispensing data
+- `presc.data` : A *data.frame* with the prescription data
+- `hosp.data` : optional, a *data.frame* with the hospitalisation data
+- `ID.colname` : The quoted name of the ID column (identical in all data sources)
+- `presc.date.colname` : The quoted name of the prescription date column (in `presc.data`)
+- `disp.date.colname` : The quoted name of the dispensing date column (in `disp.data`)
+- `date.format` : A *string* of the date format (identical in all data sources)
+- `medication.class.colnames` : A *character vector* with the name(s) of the medication identification column(s) (identical for `disp.data` and `presc.data`)
+- `total.dose.colname` : The quoted name of the column with the dispensed dose (in `disp.data`)
+- `presc.daily.dose.colname` : The quoted name of the column with the daily prescribed dose (in `presc.data`)
+- `presc.duration.colname` : : The quoted name of the the column with the prescription duration in days (in `presc.data`)
+- `VISIT.var` : optional, the quoted name of the the column with the visit number (in `presc.data`)
+- `force.init.presc` : *logical*, default *FALSE*; should first prescibed dose be used for dispensing events occuring before the first prescription event?
+- `force.presc.renew` : *logical* or *string*, default *FALSE*; if a medication has not been prescribed during a prescription event, should its prescription end on this date?  If *string*, the name of the column containing the `Logical` for each medication class separatly.
+- `split.on.dosage.change` : *logical* or *string*, default *FALSE*; in case of a dosage change, should an existing supply be split on the day of dosage change, creating a new event with the new dosage for the remaining supply? If *string*, the name of the column containing the `Logical` for each medication class separatly.
+- `trt.interruption` : A *string*, can be either *continue*, *discard*, or *carryover*, and indicates how to handle supplies affected by treatment interruptions or hospitalisations. With *continue*, interruptions have no effect on durations and dispensing start dates. With *discard*, supplies are truncated at the beginning of an interruption or hospitalisation and the remaining supply is discarded. With *carryover*, supplies are truncated at the beginning of an interruption or hospitalisation and a new dispensing start event with the remaining supply is created after the end of the interruption or hospitalisation.
 
-### Exercise: link dispensing and prescription data with AdhereR
+### Exercise: link dispensing and prescription data with `AdhereR`
 
-Use the `medication_match` function to merge `disp_events` and `presc_events` into `med_events`.
+Use the `compute_event_durations` function to merge `durcomp.dispensing` and `durcomp.prescribing` into `event_durations`. Medications should be grouped by `ATC.CODE`, `UNIT`, and `FORM` (`medication.class.colnames = c("ATC.CODE", "UNIT", "FORM")`).
+We don't want to use the first prescribed dose for dispensing events occuring before the first prescription event (`force.init.presc = FALSE`), but a prescription should end if a treatment has not been prescribed during a prescription event (`force.presc.renew = TRUE`) and we want a new event in case of dosage changes (`split.on.dosage.change = TRUE`). Treatment interruptions should have no impact on supply durations an start dates (`trt.interruption = "continue"`).
+Please note that the function takes some time to finish! You can use `summary(event_durations)` to display a summary of the results.
 
 ```{r link-multiple-sources, exercise=TRUE}
 # Merge dispensing and prescription data with AdhereR's medication_match function:
 
 ```
 
+```{r link-multiple-sources-solution}
+# Merge dispensing and prescription data with AdhereR's medication_match function:
+event_durations <- compute_event_durations(disp.data = durcomp.dispensing, 
+                                           presc.data = durcomp.prescribing, 
+                                           ID.colname = "ID", 
+                                           presc.date.colname = "DATE.PRESC", 
+                                           disp.date.colname = "DATE.DISP", 
+                                           date.format = "%Y-%m-%d",
+                                           medication.class.colnames = c("ATC.CODE", "UNIT", "FORM"), 
+                                           total.dose.colname = "TOTAL.DOSE", 
+                                           presc.daily.dose.colname = "DAILY.DOSE", 
+                                           presc.duration.colname = "PRESC.DURATION", 
+                                           visit.colname = "VISIT", 
+                                           force.init.presc = FALSE, 
+                                           force.presc.renew = TRUE, 
+                                           split.on.dosage.change = TRUE, 
+                                           trt.interruption = "continue", 
+                                           suppress.warnings = FALSE, 
+                                           return.data.table = TRUE)
+summary(event_durations)
+```
+
+### Output of *compute_event_durations*
+
 In addition to the standard AdhereR columns, the output of the matching function contains some more columns with additional information:
 
-- `FIRST.PRESC` : A *Date* column with the date when the treatment was first prescribed 
-- `PRESC.START` : A *Date* column with the start date of a prescription episode
-- `PRESC.END` : A *Date* column with the end date of a prescription episode. If there is no end date, this will be `NA`
-- `DOSAGE.CHANGE` : An *integer* column with the number of dosage changes considered for a given dispensing event.
+- `DISP.START` :  A *Date* column with the start date of the dispensing event, either the same as in disp.date.colnema or a later date in case of dosage changes or treatment interruptions/hospitalizations. This will normally be the column used as the event date in further CMA calculations
+- `DURATION` : A *numeric* column with the calculated duration of the supply, based on the total dispensed dose and the prescribed daily dose, starting from the `DISP.START` date
+- `START.PRESC` : A *Date* column with the start date of a prescription episode
+- `END.PRESC` : A *Date* column with the end date of a prescription episode. If there is no end date, this will be `NA`
+- `HOSP.DURATION` : An *integer* column with the number of days during the current supply period affected by hospitalizations.
+- `tot.presc.interruptions`: An *integer* column with the total number of prescription interruptions per patient for a specific medication.
+- `tot.dosage.changes` : An *integer* column with the number of dosage changes considered for a given dispensing event.
+
+Table 3 shows the event durations for the first patient:
+```{r, include = FALSE}
+event_durations <- compute_event_durations(disp.data = durcomp.dispensing, 
+                                           presc.data = durcomp.prescribing, 
+                                           ID.colname = "ID", 
+                                           presc.date.colname = "DATE.PRESC", 
+                                           disp.date.colname = "DATE.DISP", 
+                                           date.format = "%Y-%m-%d",
+                                           medication.class.colnames = c("ATC.CODE", "UNIT", "FORM"), 
+                                           total.dose.colname = "TOTAL.DOSE", 
+                                           presc.daily.dose.colname = "DAILY.DOSE", 
+                                           presc.duration.colname = "PRESC.DURATION", 
+                                           visit.colname = "VISIT", 
+                                           force.init.presc = FALSE, 
+                                           force.presc.renew = TRUE, 
+                                           split.on.dosage.change = TRUE, 
+                                           trt.interruption = "continue", 
+                                           suppress.warnings = FALSE, 
+                                           return.data.table = TRUE)
+```
+
+```{r}
+event_durations[ID==1]
+```
+
 
 ## Visualization of patient records
 
@@ -276,22 +328,31 @@ In addition to the standard AdhereR columns, the output of the matching function
 
 A first step towards deciding which algorithm is appropriate for these data is to explore medication histories visually. 
 
-We can do this by creating an object of type `CMA0` for the two example patients, and plotting it. 
+We can do this by creating an object of type `CMA0` for the example patients, and plotting it. 
 This type of plots can of course be created for a much bigger subsample of patients and saved as as a `JPEG`, `PNG`, `TIFF`, `EPS` or `PDF` file using `R`'s plotting system for data exploration.
 
 ```{r, echo=TRUE}
-example_data <- med.events[med.events$PATIENT_ID %in% c(37, 76), ]
+# select to patients to plot (7 and 16). Remove rows where DURATION is NA.
+example_data <- na.omit(event_durations[ID %in% c(7,16)], cols = "DURATION")
 
 cma0 <- CMA0(data=example_data, # use the two selected patients
-             ID.colname="PATIENT_ID", # the name of the column containing the IDs
-             event.date.colname="DATE", # the name of the column containing the event date
+             ID.colname="ID", # the name of the column containing the IDs
+             event.date.colname="DISP.START", # the name of the column containing the event start date
              event.duration.colname="DURATION", # the name of the column containing the duration
-             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
-             medication.class.colname="CATEGORY", # the name of the column containing the category
-             followup.window.start=0,  # FUW start in days since earliest event
-             observation.window.start=182, # OW start in days since earliest event
-             observation.window.duration=365, # OW duration in days
-             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+             event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
+             medication.class.colname="ATC.CODE"); # the name of the column containing the medication class
+```
+
+```{r plot-cma0-setup}
+# select to patients to plot (7 and 16). Remove rows where DURATION is NA.
+example_data <- na.omit(event_durations[ID %in% c(7,16)], cols = "DURATION")
+
+cma0 <- CMA0(data=example_data, # use the two selected patients
+             ID.colname="ID", # the name of the column containing the IDs
+             event.date.colname="DISP.START", # the name of the column containing the event start date
+             event.duration.colname="DURATION", # the name of the column containing the duration
+             event.daily.dose.colname="DAILY.DOSE", # the name of the column containing the dosage
+             medication.class.colname="ATC.CODE"); # the name of the column containing the medication class
 ```
 
 ## Exercise: Plot medication events
@@ -299,7 +360,7 @@ cma0 <- CMA0(data=example_data, # use the two selected patients
 Use `plot()` to visualize the medication events for `example_data`. You can set `align.all.patients = TRUE` to plot each patient relative to the earliest event date. 
 
 ```{r plot-cma0, exercise = TRUE}
-# Plot the object (CMA0 shows the actual event data only):
+# Plot the cma0-object (CMA0 shows the actual event data only):
 
 ```
 
@@ -309,6 +370,22 @@ plot(cma0, # the object to plot
      align.all.patients=TRUE # plot all patients relative to their earliest event date.
      )
 ```
+
+### Subset to medication class
+
+As you can see, both patients have a number of different medications. We are interested in *Selective beta-2-adrenoreceptor agonists* (ATC chemical subgroup *R03AC*). To subset the data to medications in this subgroup only, we can use another useful function `grepl()`, which searches for patterns in strings:
+
+```{r, echo = TRUE}
+#subset to medications of the ATC subgroup R03AC. The '^' at the beginning of the string tells the function that the following pattern has to be at the beginning of the string.
+example_data <- example_data[grepl("^R03AC",ATC.CODE)]
+```
+
+
+```{r subset_data}
+#subset to medications of the ATC subgroup R03AC. The '^' at the beginning of the string tells the function that the following pattern has to be at the beginning of the string.
+example_data <- example_data <- na.omit(event_durations[ID %in% c(7,16) & grepl("^R03AC",ATC.CODE)], cols = "DURATION")
+```
+
 
 ### Interactive plotting
 
@@ -334,25 +411,24 @@ This function cannot be used in this interactive tutorial, but you can use RStud
 
 ### Exercise: Calculate adherence
 
-Calculate CMA7 estimates for the patient with the ID 37. The follow-up window starts 30 days after the first event and the observation window should cover 120 days until 300 days after the first event. Plot the results as seen in the previous section.
+Calculate CMA7 estimates for the patient with the ID 16. The follow-up window starts 30 days after the first event and the observation window should cover 450 days, starting 180 days after the first event. Plot the results as seen in the previous section.
 
-```{r calculate-CMA7, exercise = TRUE}
+```{r calculate-CMA7, exercise = TRUE, exercise.setup = "subset_data"}
 
 ```
 
 ```{r calculate-CMA7-solution}
-example_data <- med.events[med.events$PATIENT_ID == 37, ]
-
-cma7 <- CMA7(data=example_data, # use the two selected patients
-             ID.colname="PATIENT_ID", # the name of the column containing the IDs
-             event.date.colname="DATE", # the name of the column containing the event date
-             event.duration.colname="DURATION", # the name of the column containing the duration
-             event.daily.dose.colname="PERDAY", # the name of the column containing the dosage
-             medication.class.colname="CATEGORY", # the name of the column containing the category
-             followup.window.start=30,  # FUW start in days since earliest event
-             observation.window.start=120, # OW start in days since earliest event
-             observation.window.duration=300, # OW duration in days
-             date.format="%m/%d/%Y"); # date format (mm/dd/yyyy)
+cma7 <- CMA7(data=example_data[ID == 16],
+             ID.colname="ID",
+             event.date.colname="DISP.START",
+             event.duration.colname="DURATION",
+             event.daily.dose.colname="DAILY.DOSE",
+             medication.class.colname="ATC.CODE",
+             carry.only.for.same.medication=TRUE,
+             consider.dosage.change=TRUE,
+             followup.window.start=30,
+             observation.window.start=180,
+             observation.window.duration=450); 
 
 # Plot the object:
 plot(cma7) # the object to plot
@@ -360,19 +436,26 @@ plot(cma7) # the object to plot
 
 ##  Initiation
 
-If we have a dispensing and a prescription database, we can calculate time to initiation from the output of the `medication_match` function. 
+If we have a dispensing and a prescription database, we can calculate time to initiation with the new `AdhereR` function `time_to_initiation`. 
 
 ### Exercise: Calculate time to initiation
 
-Add a column to med_events with the time to initiation, calculated as the length of time between the first prescription and the first dispensing event.
+Compute time to initiation with the function `time_do_initiation()` for the two patients in `example_data`. Select only medications with the ATC code *R03AC12* (salmeterol). 
 
-```{r time-to-initiation, exercise = TRUE}
+```{r time-to-initiation, exercise = TRUE, exercise.setup = "subset_data"}
+
+
 
 ```
 
-<div id="time-to-initiation-hint">
-**Hint:** You may want tu use the `difftime` function.
-</div>
+```{r time-to-initiation-solution}
+time_to_initiation(presc.data = example_data[grepl("R03AC12",ATC.CODE)], 
+                   disp.data = example_data[grepl("R03AC12",ATC.CODE)],
+                   ID.colname = "ID", 
+                   presc.start.colname = "START.PRESC", 
+                   disp.date.colname = "DATE.DISP", 
+                   medication.class.colnames = c("ATC.CODE", "UNIT", "FORM"))
+```
 
 ## Persistence
 
@@ -380,24 +463,24 @@ To distinguish between persistence with treatment and quality of implementation,
 
 ### Exercise: compute treatment episodes
 
-Use the `compute.treatment.episodes()` function to compute treatment episodes for the `example_data` from the first event until the end of the follow-up period (720 days) with the following conditions:
+Use the `compute.treatment.episodes()` function to compute treatment episodes for `example_data` from the first event until the end of the follow-up period (3 years) with the following conditions:
 
 - Change of medication type should be considered as a new treatment episode
 - A gap of 90 days or more should be considered as a treatment interruption/discontinuation
 - Existing supply will be finished before starting a new supply of the same medication, but not for different medications
 - If the dosage recommendation changes with a new supply, existing supply will be administered according to the new dosage recommendations
 
-```{r treatment-episodes, exercise = TRUE, exercise.eval=TRUE}
+```{r treatment-episodes, exercise = TRUE, exercise.eval=TRUE, exercise.setup = "subset_data"}
 
 ```
 
 ```{r treatment-episodes-solution}
 TEs <- compute.treatment.episodes(example_data,
-                                  ID.colname="PATIENT_ID",
-                                  event.date.colname="DATE",
+                                  ID.colname="ID",
+                                  event.date.colname="DISP.START",
                                   event.duration.colname="DURATION",
-                                  event.daily.dose.colname="PERDAY",
-                                  medication.class.colname="CATEGORY",
+                                  event.daily.dose.colname="DAILY.DOSE",
+                                  medication.class.colname="ATC.CODE",
                                   carryover.within.obs.window = TRUE, # carry-over inside the OW
                                   carry.only.for.same.medication = TRUE, # & only for same type
                                   consider.dosage.change = TRUE, # dosage change starts new episode...
@@ -406,57 +489,56 @@ TEs <- compute.treatment.episodes(example_data,
                                   maximum.permissible.gap.unit = "days", # unit for the above (days)
                                   followup.window.start = 0, # 2-years FUW starts at earliest event
                                   followup.window.start.unit = "days",
-                                  followup.window.duration = 720,
-                                  followup.window.duration.unit = "days",
-                                  date.format = "%m/%d/%Y")
+                                  followup.window.duration = 3*365,
+                                  followup.window.duration.unit = "days")
 
 TEs
 ```
 
 ## Implementation
 
-If we want to make sure to only calculate adherence during the implementation phase, AdhereR offers function to calculate any simple CMA only during treatment episodes as computed with the `compute.treatment.episodes()` function.
+If we want to make sure to only calculate adherence during the implementation phase, AdhereR offers functions to calculate any simple CMA only during treatment episodes as computed with the `compute.treatment.episodes()` function.
 
 ### Exercise: Calculate adherence for multiple treatment episodes during an observation window.
 
-Use the `CMA_per_episode()` function to compute CMA7 during the implementation phase for the `example_data` from the first event until the end of the follow-up period (720 days) with the following conditions:
+Use the `CMA_per_episode()` function to compute CMA7 during the implementation phase for the patient with the ID 7 in `example_data` from the first event until the end of the follow-up period (3 years) with the following conditions:
 
 - Change of medication type should be considered as a new treatment episode
 - A gap of 90 days or more should be considered as a treatment interruption/discontinuation
 - Existing supply will be finished before starting a new supply of the same medication, but not for different medications
 - If the dosage recommendation changes with a new supply, existing supply will be administered according to the new dosage 
 
-```{r implementation, exercise = TRUE}
-# Calculate CMA7:
+
+```{r implementation, exercise = TRUE, exercise.setup = "subset_data"}
+
 
 ```
 
 ```{r implementation-solution}
 # Calculate CMA7:
 cmaE <- CMA_per_episode(CMA="CMA7", # apply the simple CMA7 to each treatment episode
-                        data=example_data,
-                        ID.colname="PATIENT_ID",
-                        event.date.colname="DATE",
+                        data=example_data[ID == 7],
+                        ID.colname="ID",
+                        event.date.colname="DISP.START",
                         event.duration.colname="DURATION",
-                        event.daily.dose.colname="PERDAY",
-                        medication.class.colname="CATEGORY",
+                        event.daily.dose.colname="DAILY.DOSE",
+                        medication.class.colname="ATC.CODE",
                         carryover.within.obs.window = TRUE,
-                        carry.only.for.same.medication = FALSE,
-                        consider.dosage.change = FALSE, # conditions on treatment episodes
+                        carry.only.for.same.medication = TRUE,
+                        consider.dosage.change = TRUE, 
                         medication.change.means.new.treatment.episode = TRUE,
-                        maximum.permissible.gap = 180,
+                        maximum.permissible.gap = 90,
                         maximum.permissible.gap.unit = "days",
                         followup.window.start=0,
                         followup.window.start.unit = "days",
-                        followup.window.duration = 365 * 2,
+                        followup.window.duration = 365 * 3,
                         followup.window.duration.unit = "days",
                         observation.window.start=0,
                         observation.window.start.unit = "days",
-                        observation.window.duration=365*2,
-                        observation.window.duration.unit = "days",
-                        date.format="%m/%d/%Y")
+                        observation.window.duration=365*3,
+                        observation.window.duration.unit = "days")
 
-plot(cmaE, patients.to.plot=c("76"), show.legend=FALSE)
+plot(cmaE, show.legend=FALSE)
 ```
 
 
