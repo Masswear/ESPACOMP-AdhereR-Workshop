@@ -374,7 +374,7 @@ event_durations_list$event_durations[ID==1]
 
 ### Further data preparation
 
-In principle the output of compute_event_durations can be used directly for CMA computation (after removing rows with zero or missing durations). However, `AdhereR` offers additional functions `prune_event_durations` and `cover_special_periods` to deal with specific cases. Please refer to the vignette [Data preparation for computing adherence to medication in AdhereR](https://masswear.github.io/Webinar_1_06-19/compute_event_durations.html) for additional information.
+In principle the output of compute_event_durations can be used directly for CMA computation (after removing rows with zero or missing durations). However, `AdhereR` offers additional functions `prune_event_durations` and `cover_special_periods` to deal with specific cases. Please refer to the vignette [Data preparation for computing adherence to medication in AdhereR](https://ddediu.github.io/AdhereR/compute_event_durations/compute_event_durations.html){:target="_blank"} for additional information.
 
 ## Visualization of patient records
 
