@@ -6,17 +6,25 @@
 #          A Dima, Nov 2019; Example script        #
 #      Contact: alexandra.dima@univ-lyon1.fr       #
 ####################################################
-# Acknowledgements: Thanks to Dan Dediu and Mike Allerhand for previous R intros
-# other sources: http://venus.ifca.unican.es/Rintro/ ; http://www.ats.ucla.edu/stat/r/
-####################################################
 
 # R script is commented with #'s 
+# Optional things that might make your life more meaningful are marked with ^^^^^
+
+# ^^^^^ for more info and exercises, check this intro to R: http://cran.r-project.org/doc/contrib/Torfs+Brauer-Short-R-Intro.pdf
+
+###########################################################
+# Acknowledgements:
+# Thanks to Dan Dediu and to Mike Allerhand for previous R intros
+# other sources: 
+# http://venus.ifca.unican.es/Rintro/
+# http://www.ats.ucla.edu/stat/r/
+###########################################################
+
 
 # first make sure you set a folder for your R work, e.g. 
 setwd("~/ACTIVE/ESPACOMP/ADAworkshop19")
 # OR go to Session --> Set Working Directory --> To Source File Location
-# check where you are
-getwd()
+
 
 # now see what R does if you write a number
 
@@ -24,73 +32,75 @@ getwd()
 
 # R echoes back your input
 
-# and if you want to add 2 numbers?
+# what if you want to add 2 numbers?
 
 1+2 
 
 # R behaves like a calculator
-# for example if you want to calculate % adherence (implementation) 
-# for a patient who had 90 days of medication supply over 4 months:
-# days supply/ total days * 100
 
-90/120*100
+(3465-435)*23/12
 
+# it is really a calculator 
 # but nothing has been saved in the environment so far
 # for this to happen, you need to give a name to an object
 
-supply <- 90 
+x <- 3 
 
-# the 'supply' object is now in the environment, and has the value 90 
+# your x is now in the environment, and has the value 1 
 # (it is called a scalar = vector with a single value/element)
 
 # you can now call it by its name
 
-supply
+x
 
 # or 
 
-print(supply)
+print(x)
 
 # R prints the value
 
-# now you can do things with supply
+# now you can do things with x
 
-supply+30 # addition
-supply-30 # substraction
-supply*2 # multiplication
-supply/2 # division
-supply^2 # power
-sqrt(supply) # square root
+x+1 # addition
+x-1 # substraction
+x*2 # multiplication
+x/2 # division
+x^2 # power
+sqrt(x) # square root
+log(x) # log base e
+exp(x) # e^x
+log(x,base=10) # log base 10
+2^x
 
+# if you asign a different value to x, the previous value is forgotten
 
-# if you assign a different value to supply, the previous value is forgotten
-
-supply <- 60
+x <- 7
 
 # you can assign numbers as above, but also strings...
 
-supply <- "patient's medication supply"
-supply
+x <- "respondent"
+x
 
 # ... and add to the same string to form a new object
 
-supply2 <- paste("another ", supply,sep="") # "paste" concatenates strings together
-supply2
+y <- paste("second ", x,sep="") # "paste" concatenates strings together
+y
 
 
 # ... and make vectors with more than 1 value/element
-supply.list <- c(supply, supply2, "third patient's supply", "last patient's supply")
-supply.list
+z <- c(x,y, "third", "last one")
+z
 
 # OR 
 
-x <- c(1,2,3,4,5,6)
-x
+w <- c(1,2,3,4,5,6)
+w
 
 # OR
 
-x <- 1:6
-x
+w <- 1:6
+w
+
 
 # you can do maths with these sorts of vectors
 
@@ -107,13 +117,13 @@ x/y # Division
 x^y # Power
 
 
-# you can also access(select) one or some elements in a vector
-y[2]
-y[3]
-y[1:2]
+# you can also select one or some elements in a vector
+z[2]
+z[3]
+z[1:2]
 # and reassign another value to an element
-supply.list[1] <- "first patient's supply"
-supply.list
+z[1] <- "the very first respondent"
+z
 
 
 # ... and also make Boolean (logical) vectors
@@ -126,17 +136,20 @@ q <- c(TRUE, FALSE, FALSE, TRUE)
 ##-------------##
 #### TO DO 1 ####
 
-# here is an object November.days which represents a vector of all days in this month
-November.days <- c(1:30)
-November.days.seq <- seq(1:30) # identical to November.days
-# and an object week.days which represents a vector of all days in a week
+# define an object February.days which represents a vector of all days in this month
+
+February.days <- c(1:28)
+February.days.seq <- seq(1:28)
+
+# define an object week.days which represents a vector of all days in a week
+
 week.days <- c("M", "Tu", "W", "Th", "F", "Sa", "Su")
 
-# access the day of the month for today (19 Nov) from the *November.days* vector
-# fill in here
+# access the day of the month for today
+February.days[22]
 
-# access the day of the week for today (Tu) from the week.days vector
-# fill in here
+# access the day of the week for today
+week.days[3]
 
 ##-------------##
 
@@ -164,35 +177,39 @@ b[-1,-2]
 
 # define a matrix four.weeks with 7 columns and 4 rows which includes 28 elements from 1 to 28
 
-# fill in here
+four.weeks <- matrix(1:28,nrow=4,ncol=7) 
 
 # access the second day of the 3rd week
 
-# fill in here
+selected.day <- four.weeks[3, 2]
 
 ##-------------##
 
 
-# you can also create data frames - the type of objects that would store a usual dataset
-implem.scores <- data.frame( "SubjID"=1:4, # first column has the subject IDs
-                 "Label"=supply.list, # second column has the supply.list object
-                 "Supply"=c(90,NA,60,120) ) # the third column has the values of their supplies, the second score is missing
+
+# and can also create data frames - the type of objects that would store an usual dataset
+respondents.scores <- data.frame( "SubjID"=1:4, # first column has the subject IDs
+                 "Label"=z, # second column has the z object (the vector with our respondents
+                 "Score"=c(NA,23,15,54.5) ) # the third column has their scores, the first score is missing
 
 # check how it looks like
-implem.scores
+respondents.scores
 
 # you can see it in a separate window
-View(implem.scores)
+View(respondents.scores)
 
 
-# ..and also make lists
+# ..and you can also make lists
 l <- list(1,2,"aa",3,list("bb",NA,0),10) # list composed of 4 numbers, 1 string and 1 sublist (embedded list) composed of a string, a number and the special value for "missing data" (NA)
 l
 
 # in case you forgot what you have here (or just want to check)...
 
-class(supply.list)
-class(implem.scores)
+class(x)
+class(z)
+class(w)
+class(a)
+class(respondents.scores)
 class(l)
 
 # ... class tells you what these objects are
@@ -229,7 +246,7 @@ o <- ordered(o,
 #### TO DO 3 ####
 
 # find out what class is the object called f
-# fill in here
+class(f)
 
 ##-------------##
 
@@ -237,27 +254,27 @@ o <- ordered(o,
 # you can also check what is stored in a data frame 
 
 # what are the variable names
-names(implem.scores)
+names(respondents.scores)
 # ... which are the same with column names
-colnames(implem.scores)
+colnames(respondents.scores)
 # check the name of the second variable
-names(implem.scores)[2]
+names(respondents.scores)[2]
 # change it if you don't like it
-names(implem.scores)[2] <- "Description"
+names(respondents.scores)[2] <- "Name"
 # check which are the row names
-rownames(implem.scores)
+rownames(respondents.scores)
 # and change these too
-rownames(implem.scores) <- c("John","Mike","Anna","Kenny")
+rownames(respondents.scores) <- c("John","Mike","Anna","Kenny")
 # or only one of them
-rownames(implem.scores)[4] <- "Kenny Jr."
+rownames(respondents.scores)[4] <- "Kenny Jr."
 # and view the results
-View(implem.scores)
+View(respondents.scores)
 
 ##-------------##
 #### TO DO 4 ####
 
 # access the score and label of the second respondent
-# fill in here
+respondents.scores[2, c("SubjID", "Score") ]
 
 ##-------------##
 
@@ -265,81 +282,49 @@ View(implem.scores)
 # Now we've placed a lot of stuff in the environment, and it gets messy
 # it is time for some basic memory management
 ls() # lists the currently defined objects (e.g., variables)
-rm(o) # removes an object from memory, freeing some space
+rm(a) # removes an object from memory, freeing some space
 
+# respondents.scores[, "Score"]
 #...and do your first descriptive statistic
-mean(implem.scores$Supply)
+mean(respondents.scores$Score)
 
 # R does not ignore NAs automatically, so you have to tell it to do so
-mean(implem.scores$Supply, na.rm=TRUE)
+mean(respondents.scores$Score, na.rm=TRUE)
 
-# ... and we can calculate implementation over 4 months given the medication supply 
-implem.scores$Implem <- implem.scores$Supply/120*100
+# ... and we can add their random IQ scores by the following function
+respondents.scores$IQ <- rnorm(4, mean=100, sd=15)
 # see the values
-implem.scores$Implem
+respondents.scores$IQ
 
-# ... and see how well they implement on average
-mean(implem.scores$Implem, na.rm=TRUE)
-# and the minimum score
-min(implem.scores$Implem, na.rm=TRUE)
+# ... and see how clever they are on average
+mean(respondents.scores$IQ)
 
-
-# ... and dichotomize Implementation scores (only if you have good reasons to do so!)
-implem.scores$Implem2cat[implem.scores$Implem>=90] <- "90 or above" 
-implem.scores$Implem2cat[implem.scores$Implem<90] <- "less than 90"
+# ... and dichotomize IQ scores
+respondents.scores$IQ2cat[respondents.scores$IQ>100] <- "above" 
+respondents.scores$IQ2cat[respondents.scores$IQ<=100] <- "average or less"
 
 # and see the new variable
-implem.scores$Implem2cat
+respondents.scores$IQ2cat
 # and check if this is coded properly - compare with initial variable
-implem.scores$Implem
+respondents.scores$IQ
 
+# we can also increase the IQ scores of some values
+# first copy the variable
+respondents.scores$IQplus <- respondents.scores$IQ
+# then modify only 2 values (2 and 3)
+respondents.scores$IQplus[2:3] <- respondents.scores$IQ[2:3] +15
 
-# you can do this as a function
-# for calculation of implementation
-
-impute.implem <- function(supplydays, totaldays){
-  
-  implem.perc <- supplydays/totaldays*100
-  return(implem.perc)
-}
-
-implem.scores$ImplemF <- impute.implem(implem.scores$Supply, 120)
-implem.scores$ImplemF
-
-# for dichotomisation
-
-dichot.implem <- function(implem.value, threshold){
-  implem.cat <- c()
-  for (i in 1:length(implem.value) ){
-    if (is.na(implem.value[i])){
-      implem.cat[i] <- NA
-    } else if (implem.value[i] >= threshold){
-      implem.cat[i] <- paste(threshold, " or over", sep="")
-    } else {
-      implem.cat[i] <- paste("less than ", threshold, sep="")
-    }
-  }
-  return(implem.cat)
-}
-
-implem.scores$Implem2catF <- dichot.implem(implem.scores$ImplemF, 90)
-implem.scores$Implem2catF
-
-# and view the results
-implem.scores[,c("Implem", "Implem2cat","ImplemF" ,  "Implem2catF")]
-
+# and see the new variable
+respondents.scores$IQplus
 
 ##-------------##
 #### TO DO 5 ####
 
-# let's imagine that the total number of days for which these supplies were calculated was 150 (5 months)
-# calculate a new variable with implementation scores for the 5-month period
-
-implem.scores$Implem5M <- # fill in here
-  
-# check what is the maximum and minumum 5-month implementation  score in your sample
-
-# fill in here
+# generate a new variable that represents their emotional intelligence scores (EQ)
+respondents.scores$EQ <- rnorm(4, mean=100, sd=15)
+# check what is the maximum and minumum EQ score in your sample
+min(respondents.scores$EQ)
+max(respondents.scores$EQ)
 
 ##-------------##
 
@@ -348,7 +333,7 @@ implem.scores$Implem5M <- # fill in here
 # or write this:
 save.image(file = "my1stEnvironment.RData")
 
-# don't forget to clean up your environment before starting a new session - click on the broom icon in the 'environment' tab.
+# don't forget to clean up your environment before starting a new session. There is a little broom in the 'environment' tab.
 
 
 

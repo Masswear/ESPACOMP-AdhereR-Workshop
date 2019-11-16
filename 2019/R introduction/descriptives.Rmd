@@ -1,5 +1,5 @@
 ---
-title: "Descriptive statistics one dataset for example"
+title: "Importing datasets and performing descriptives"
 author: "Alex Dima"
 date: " `r Sys.Date()`"
 output: 
@@ -10,141 +10,102 @@ output:
     tables: TRUE
 ---
 
-#Summary 
+# Summary 
 
-This document imports several datasets from different formats. .... more text to remember what I do
+This document imports several datasets with which we will work during the data analysis workshop. You can explore one of these datasets (or import and explore your own dataset) using what you have learned from the abccode script and the new functions presented below.
+
 
 ```{r setup, warning=FALSE, message=FALSE, echo=FALSE}
-# this is section of R script imports and uploads some libraries which will be used later on
-# here you may want to define some useful settings and functions if your analysis is more complex
 
 # install and upload some useful libraries ####
 
-for (n in c('foreign', 'readxl', 'utils', 'relimp', 'tableone',
-            'dplyr', 'tidyr', 'reshape2', 'tibble', 'ggplot2', 
+for (n in c('readxl', 
+            'tableone', 'ggplot2', 
+            'AdhereR',
+            'dplyr', 'tidyr',
             'knitr', 'bookdown'))
 {
   if(!require(n,character.only=TRUE)){install.packages(n)}
   library(n,character.only=TRUE)
 }
 
-#  brief info on the uses of these libraries:
-#  for importing data: 'readr', 'readxl'
-#  for data viewing, writing: 'utils', 'relimp'
-#  for data management: 'dplyr', 'tidyr', 'reshape2', 'tibble', 
-#  for reporting documents: 'knitr', 'bookdown'
-#  for plotting: 'ggplot'
-
 ```
 
-```{r dataset, warning=FALSE, message=FALSE, echo=FALSE}
-# this is a section of R script for importing data from other formats and checking it to make sure you imported the right one
-# you can modify depending on the format and name of your dataset
+Three datasets are imported, four other are available within the AdhereR package.
 
-### import data files with an .RData format (e.g. exported at the end of data preparation in a prior R script) ####
-load("my1stEnvironment.RData")
+```{r dataset, include=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+# import data from other formats and check it 
 
-# Here are examples of how you can import data from excel, csv, and SPSS
-
-### from excel:
-# this is a dataset available on https://zenodo.org/record/854656#.Wfy4K1ynGog
-campus <- read_xlsx("./DatabaseHealthCampusStudies.xlsx", sheet = 1) # read in the first worksheet from the workbook myexcel.xlsx, first row contains variable names (default)
-
+# for SR data analysis
+## from excel:
+data.3Qs <- read_excel("SR_BIN1_data.xlsx", 2) # read in the 2nd worksheet from the workbook SR_BIN1_data.xlsx, first row contains variable names (default)
 # check data 
-# View(campus)
+# View(data.3Qs)
 # OR
-# head(campus)
-# check sample size
-nrow(campus)
-# check variable names
-names(campus)
+head(data.3Qs)
 
+
+# the data for the EM data analysis
 ### from csv:
-HoNOS <- read.table(file="./HoNOSData.csv",
-                     header=TRUE, # first row contains variable names
-                     sep=","   # comma is separator
-                     ) 
+data.onco <- read.csv2("Onco.csv",na.string = "",header=T)  
+head(data.onco)
+data.RIVA <- read.csv2("RIVA.csv",na.string = "",header=T)  
+head(data.RIVA)
 
-# from SPSS:
-# this is a dataset available on https://zenodo.org/record/16272#.Wfy47FynGog
-surgery <- foreign::read.spss("./Andersen_1_2015.sav", to.data.frame = TRUE, 
-  use.value.labels = FALSE, use.missings = FALSE)
+# for the EHD analysis, datasets are available with the AdhereR package
+head(med.events)
+head(durcomp.prescribing)
+head(durcomp.dispensing)
+head(durcomp.hospitalisation)
 
-# select a part of a dataset you want to work with
-# for example, if the item set you want to study is the questionnaire in the HoNOS data, the code would be:
-HONOSqre <- HoNOS[7:18]
-
-##-------------##
-#### TO DO 1 ####
-
-# add the sample sizes of the other 2 datasets in the text below this R section
-
-##-------------##
+# explore the self-report dataset
+# check sample size
+nrow(data.3Qs)
+# check variable names
+names(data.3Qs)
+# check number of unique IDs (sample size)
+length(unique(data.3Qs$DATSTAT_ALTPID_fix))
+# check number of observations per patient
+table(table(data.3Qs$DATSTAT_ALTPID_fix))
+# check number of visits per patient
+table(data.3Qs$visitnumber)
 
 ```
 
-These datasets have the following sample sizes: `r nrow(campus)` participants (the Campus dataset), `r nrow(HoNOS)` participants (the HoNOS dataset), `r nrow(surgery)` participants (the Surgery dataset).
+The datasets imported have the following sample sizes: 
 
-# Descriptives
+- `r length(unique(data.onco$id))` participants (the Onco dataset), 
+- `r length(unique(data.onco$id))` participants (the RIVA dataset), 
+- `r length(unique(data.3Qs$DATSTAT_ALTPID_fix))` participants (the Self-report dataset).
 
-Response frequencies and descriptive statistics are examined for a range of questions in the Campus dataset. You can do the same with the other datasets imported.
+## Descriptives
 
+Response frequencies and descriptive statistics are examined for some variables in the Self-report dataset. You can do the same with the other datasets imported.
 
 ```{r, include=FALSE, warning=FALSE, echo=FALSE, message=FALSE}
 
 # run frequencies for all items
-for( n in names(campus))
+for( n in names(data.3Qs))
 {
   cat( "\n", n, ":" );
-  print( table( campus[,n], exclude=NULL ) );
+  print( table( data.3Qs[,n], exclude=NULL ) );
 }
 
 # check how a variable is coded
-class(campus$Study)
+class(data.3Qs$gender)
 # check the frequencies for a single variable
-table(campus$Study, exclude=NULL)
+table(data.3Qs$gender, exclude=NULL)
 # transform into factor variable
-campus$StudyF <- as.factor(campus$Study)
-# check mode
-which.max(table(campus$StudyF))
-
-
-# check how this variable is coded
-class(campus[,"Gender 1:H 2:F"])
-# change name variable
-names(campus)[names(campus) == "Gender 1:H 2:F"] <- "Gender"
-# check coding again
-class(campus$Gender)
-# check the frequencies for a single variable
-table(campus$Gender, exclude=NULL)
-
-# transform into factor variable
-campus$GenderF <- as.factor(campus$Gender)
-# check the frequencies again
-table(campus$GenderF, exclude=NULL)
-
-# define levels
-levels(campus$GenderF) <- c("H", "F")
-# check the frequencies again
-table(campus$GenderF, exclude=NULL)
+data.3Qs$genderF <- as.factor(data.3Qs$gender)
+# check frequencies
+table(data.3Qs$genderF, exclude=NULL)
+# check frequencies when every patient is selected once (visit)
+table(data.3Qs$genderF[data.3Qs$visitnumber==1], exclude=NULL)
 
 ##-------------##
-#### TO DO 2 ####
+#### TO DO 1 ####
 
-# change the name of the variable "3  BMI"  into "BMI"
-names(campus)[names(campus) == "3  BMI"] <- "BMI"
-
-# check what class is "BMI" and do a frequency table
-
-##-------------##
-
-# check how a variable is coded
-class(campus$AGE)
-
-##-------------##
-#### TO DO 3 ####
-
-# check descriptives for AGE
+# check descriptives for SDEM1_AGE
 # min()
 # max()
 # range()
@@ -155,72 +116,57 @@ class(campus$AGE)
 
 ##-------------##
 
-
-#table one
-
-myVars <- c("GenderF", "BMI", "AGE")
+# demographics descriptives: table one
+myVars <- c("genderF",  "SDEM1_AGE")
 ## Vector of categorical variables that need transformation
-catVars <- c("GenderF", "BMI")
+catVars <- c("genderF")
 ## Create a TableOne object
 tab1 <- CreateTableOne(vars = myVars, # all variables to include in table
-                       data = campus, # the dataset
-                       factorVars = catVars, # categorical variables
-                      strata = "StudyF" # which variable to use for stratifying the table
+                       data = data.3Qs[data.3Qs$visitnumber==1,], # the dataset
+                       factorVars = catVars #, # categorical variables
+                      #strata = "StudyF" # which variable to use for stratifying the table
                       ) 
-tabQoF <- print(tab1, 
+tabDemogr <- print(tab1, 
       showAllLevels = TRUE, # if all factor levels should be included in the table for categorical variables
       # SMD=TRUE # to show standardized mean differences
       test=FALSE)
 
-rownames(tabQoF) <- c("n", "Gender (%)", "",   
-                           "BMI (%)", "", "", 
-                            "Age (mean (SD))"  )
-tabQoF  <- cbind("Values" = rownames(tabQoF), tabQoF)
-rownames(tabQoF) <- NULL
-colnames(tabQoF) <- c("Indicator", "Levels", "Study1", "Study2" )
 ```
+
+The table below shows descriptive statistics for gender and age of the self-report sample:
 
 ```{r, results = 'asis', warning=FALSE, echo=FALSE, message=FALSE}
-
-knitr::kable(tabQoF)
+knitr::kable(tabDemogr)
 
 ```
+
+A histogram is shown here for the age variable, with the graphics and the ggplot2 packages
 
 ```{r, fig.width=5, fig.height=5, warning=FALSE, echo=FALSE, message=FALSE}
 
 # plotting
+hist(data.3Qs$SDEM1_AGE[data.3Qs$visitnumber==1], 
+     main = "Histogram of Age")
 
-# "Filiere 4 classes" 
-# change name variable
-names(campus)[names(campus) == "Filiere 4 classes"] <- "Filiere4"
-pie(table(campus$Filiere4, exclude=NULL), main="Piechart Filiere 4 categories")
-barplot(table(campus$Filiere4))
-
-# pour les continues
-boxplot(campus$AGE)
-hist(campus$AGE)
-
-# avec ggplot
-myAGEplot <- ggplot(campus, aes(x=AGE)) + geom_histogram()
+# with ggplot
+myAGEplot <-
+  ggplot(data.3Qs[data.3Qs$visitnumber == 1, ], aes(x = SDEM1_AGE)) + 
+  geom_histogram() 
 myAGEplot
 
 ##-------------##
-#### TO DO 4 ####
+#### TO DO 2 ####
 
+# change the title of the basic histogram:
+# add a label for the x axis by looking at the hist function help
 
-# do 3 barplots for 3 variables 
-# find the variable and check format
-# do any necessary transformations / labelling
-# do the barplots with basic functions
-# do the barplots with ggplot
+# change the looks of the ggplot histogram:
+# change design & add axis labels: see what happens if you add to myAGEplot the following 
+# + theme_classic() + labs( x = "years", y = "number of participants")
 
-# change the size of the plots
-
-# add titles, subtitles, labels, colors to all plots
-
+# look at the data viz cheatsheet and add colors to myAGEplot
 
 ##-------------##
-
 
 ```
 
