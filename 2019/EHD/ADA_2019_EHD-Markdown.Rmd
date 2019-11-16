@@ -104,11 +104,11 @@ summary(durcomp.dispensing)
 ```
 
 
-We can now merge the three datasets and calculate the duration for each dispensing event, using the `compute_event_durations` function, which links dispensing, prescription, and hospitalization data. For each dispensing event, it automatically selects the last prescribed dose to calculate supply duration, checks for prescription changes and hospitalizations during this period, and adjusts the duration accordingly. It requires the following input:
+We can now merge the three datasets and calculate the duration for each dispensing event, using the `compute_event_durations` function, which links dispensing, prescription, and special periods data. For each dispensing event, it automatically selects the last prescribed dose to calculate supply duration, checks for prescription changes and special periods (such as hospitalisations) during this period, and adjusts the duration accordingly. It requires the following input:
 
 - `disp.data` : A *data.frame* with the dispensing data
 - `presc.data` : A *data.frame* with the prescription data
-- `hosp.data` : optional, a *data.frame* with the hospitalization data
+- `special.periods.data` : optional, a *data.frame* with the containing the information about special periods 
 - `ID.colname` : A *string* of the ID column (identical in all data sources)
 - `presc.date.colname` : A *string* of the prescription date column (in `presc.data`)
 - `disp.date.colname` : A *string* of the dispensing date column (in `disp.data`)
